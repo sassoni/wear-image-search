@@ -27,9 +27,6 @@
             </intent-filter>
         </service>
 
-        <activity
-            android:name=".WImagesGridActivity"
-           />
     </application>
 
 </manifest>

@@ -46,8 +46,8 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
         View view;
 
         if (row != 10) {
-            view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_view_pager_item, null);
-//        final View view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_view_pager_item, viewGroup, false);
+            view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_pager_image, null);
+//        final View view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_pager_image, viewGroup, false);
             ImageView imageView = (ImageView) view.findViewById(R.id.imageView);
             CircledImageView circledImageView = (CircledImageView) view.findViewById(R.id.pager_visit_page_btn);
             ProgressBar progressBar = (ProgressBar) view.findViewById(R.id.pager_progress_bar);
@@ -67,7 +67,7 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
                 circledImageView.setVisibility(View.VISIBLE);
             }
         } else {
-            view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_view_pager_load, null);
+            view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_pager_load_more, null);
         }
 
         viewGroup.addView(view);
