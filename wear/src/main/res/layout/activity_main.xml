@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white"
+    tools:context=".MyActivity">
+
+    <android.support.wearable.view.CircledImageView
+        android:id="@+id/main_tap_to_search_btn"
+        android:layout_width="110dp"
+        android:layout_height="110dp"
+        android:layout_centerInParent="true"
+        android:src="@drawable/icon_search"
+        app:circle_color="@color/red"
+        app:circle_radius="50dp"
+        app:circle_radius_pressed="55dp" />
+
+    <TextView
+        android:id="@+id/main_tap_to_search_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/main_tap_to_search_btn"
+        android:layout_centerInParent="true"
+        android:layout_marginTop="10dp"
+        android:text="Tap to search"
+        android:textColor="@color/common_signin_btn_light_text_default" />
+
+    <android.support.wearable.view.GridViewPager xmlns:android="http://schemas.android.com/apk/res/android"
+        android:id="@+id/main_grid_view_pager"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:keepScreenOn="true"
+        android:visibility="gone" />
+</RelativeLayout>
+
+
