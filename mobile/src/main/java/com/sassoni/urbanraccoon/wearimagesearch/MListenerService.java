@@ -2,7 +2,6 @@ package com.sassoni.urbanraccoon.wearimagesearch;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.os.Bundle;
 import android.util.Log;
 
 import com.android.volley.Request;
@@ -38,13 +37,15 @@ import java.util.concurrent.TimeUnit;
 
 // TODO Add check for the wearable api
 // Check here https://developer.android.com/google/auth/api-client.html#WearableApi
+// TODO Check how to handle all error cases
+// TODO Add path checking onMessageReceived.
 public class MListenerService extends WearableListenerService {
 
     private static final String TAG = "----- PHONE: " + MListenerService.class.getSimpleName();
-    GoogleApiClient mGoogleApiClient;
-    RequestQueue queue;
 
-    List<MGoogleImage> imageList;
+    private GoogleApiClient googleApiClient;
+    private RequestQueue requestQueue;
+    private static int searchStartIndex = 1;
 
     @Override
     public void onCreate() {
@@ -65,125 +66,113 @@ public class MListenerService extends WearableListenerService {
     public void onMessageReceived(MessageEvent messageEvent) {
         super.onMessageReceived(messageEvent);
 
+        Log.i(TAG, "Message received: " + new String(messageEvent.getData()));
 
-//        GoogleApiClient mGoogleApiClient = new GoogleApiClient.Builder(this)
-//                .addConnectionCallbacks(new GoogleApiClient.ConnectionCallbacks() {
-//                    @Override
-//                    public void onConnected(Bundle connectionHint) {
-//                        Log.d(TAG, "onConnected: " + connectionHint);
-//                        // Now you can use the data layer API
-//                    }
-//
-//                    @Override
-//                    public void onConnectionSuspended(int cause) {
-//                        Log.d(TAG, "onConnectionSuspended: " + cause);
-//                    }
-//                })
-//                .addOnConnectionFailedListener(new GoogleApiClient.OnConnectionFailedListener() {
-//                    @Override
-//                    public void onConnectionFailed(ConnectionResult result) {
-//                        Log.d(TAG, "onConnectionFailed: " + result);
-//                    }
-//                })
-//                .addApi(Wearable.API)
-//                .build();
-
-
-        if (mGoogleApiClient == null || !mGoogleApiClient.isConnected()) {
-            mGoogleApiClient = new GoogleApiClient.Builder(this)
+        if (googleApiClient == null || !googleApiClient.isConnected()) {
+            googleApiClient = new GoogleApiClient.Builder(this)
                     .addApi(Wearable.API)
                     .build();
         }
-        ConnectionResult connectionResult = mGoogleApiClient.blockingConnect(30, TimeUnit.SECONDS);
+        ConnectionResult connectionResult = googleApiClient.blockingConnect(30, TimeUnit.SECONDS);
 
         if (!connectionResult.isSuccess()) {
-            Log.e(TAG, String.format("GoogleApiClient connect failed with error code %d", connectionResult.getErrorCode()));
+            Log.i(TAG, "GoogleApiClient connect failed with error code " + connectionResult.getErrorCode());
+            // anything else?
+        } else {
+            requestQueue = Volley.newRequestQueue(this);
+            String keyword = new String(messageEvent.getData());
+            requestImagesFor(keyword);
         }
-        // else return
+    }
 
-
-        imageList = new ArrayList<MGoogleImage>();
-
-        Log.i(TAG, "Message received: " + new String(messageEvent.getData()));
-
-        // Do the request here
-        queue = Volley.newRequestQueue(this);
-
-        String encodedPhrase = "";
+    private void requestImagesFor(String keyword) {
+        String encodedKeyword = "";
         try {
-            encodedPhrase = URLEncoder.encode(new String(messageEvent.getData()), "UTF-8");
+            encodedKeyword = URLEncoder.encode(keyword, "UTF-8");
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         }
-        String url = "https://www.googleapis.com/customsearch/v1?" + encodedPhrase;
+
+        String url = "https://www.googleapis.com/customsearch/v1?searchType=image&key=" + Keys.API_KEY
+                + "&cx=" + Keys.CSE_CREATOR + ":" + Keys.CSE_ID
+                + "&q=" + encodedKeyword
+                + "&num=" + Common.IMAGE_LIMIT
+                + "&start=" + searchStartIndex;
 
         JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null,
                 new Response.Listener<JSONObject>() {
                     @Override
                     public void onResponse(JSONObject jsonObject) {
                         Log.i(TAG, "Got json response back");
+
+                        List<MGoogleImage> thumbnailList = new ArrayList<MGoogleImage>();
+
                         try {
                             JSONArray items = jsonObject.getJSONArray("items");
 
-                            // TODO This should be the num of the request
-                            for (int i = 0; i < 10; i++) {
+                            for (int i = 0; i < items.length(); i++) {
                                 JSONObject item = items.getJSONObject(i);
                                 JSONObject image = item.getJSONObject("image");
                                 MGoogleImage googleImage = new MGoogleImage(i, image.getString("thumbnailLink"), image.getString("contextLink"));
-                                imageList.add(googleImage);
-                                Log.i("TAG", image.toString());
+                                thumbnailList.add(googleImage);
                             }
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
-
-                        // TODO We can do the request directly in the previous loop
-                        downloadImages();
-
+                        downloadImages(thumbnailList);
                     }
                 },
                 new Response.ErrorListener() {
                     @Override
                     public void onErrorResponse(VolleyError volleyError) {
-
+                        // what?
                     }
                 });
 
-        queue.add(jsonObjectRequest);
+        requestQueue.add(jsonObjectRequest);
+    }
 
+    private void downloadImages(List<MGoogleImage> imageList) {
+        Log.i(TAG, "Starting image download");
 
-/*        // Send the data
-        if (mGoogleApiClient == null || !mGoogleApiClient.isConnected()) {
-            mGoogleApiClient = new GoogleApiClient.Builder(this)
-                    .addApi(Wearable.API)
-                    .build();
+        for (final MGoogleImage image : imageList) {
+            String imageUrl = image.getThumbnailLink();
+            Log.i(TAG, "URL: " + imageUrl);
+            ImageRequest request = new ImageRequest(imageUrl,
+                    new Response.Listener<Bitmap>() {
+                        @Override
+                        public void onResponse(Bitmap bitmap) {
+                            image.setThumbnail(bitmap);
+                            sendImageToWatch(image);
+                        }
+                    }, 0, 0, null,
+                    new Response.ErrorListener() {
+                        public void onErrorResponse(VolleyError error) {
+                            // what?
+                        }
+                    });
+            requestQueue.add(request);
+        }
+    }
 
-            ConnectionResult connectionResult = mGoogleApiClient.blockingConnect(30, TimeUnit.SECONDS);
+    private void sendImageToWatch(MGoogleImage image) {
+        Log.i(TAG, "Sending image");
 
-            if (!connectionResult.isSuccess()) {
-                Log.e(TAG, String.format("GoogleApiClient connect failed with error code %d", connectionResult.getErrorCode()));
-            } else {
-                Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.debug_background_4);
+        PutDataMapRequest dataMap = PutDataMapRequest.create(Common.PATH_IMAGE);
 
-                PutDataMapRequest dataMap = PutDataMapRequest.create("/image");
+        dataMap.getDataMap().putAsset(Common.DMAP_KEY_IMAGE, toAsset(image.getThumbnail()));
+        dataMap.getDataMap().putInt(Common.DMAP_KEY_INDEX, image.getIndex());
+        dataMap.getDataMap().putString(Common.DMAP_KEY_CONTEXT_URL, image.getContextLink());
+        dataMap.getDataMap().putLong(Common.DMAP_KEY_TIME, new Date().getTime());
 
-                dataMap.getDataMap().putAsset("image", toAsset(icon));
-                dataMap.getDataMap().putInt("index", 4);
-                dataMap.getDataMap().putLong("time", new Date().getTime());
-
-                PutDataRequest request = dataMap.asPutDataRequest();
-                Wearable.DataApi.putDataItem(mGoogleApiClient, request)
-                        .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
-                            @Override
-                            public void onResult(DataApi.DataItemResult dataItemResult) {
-                                Log.i(TAG, "Sending image was successful: " + dataItemResult.getStatus()
-                                        .isSuccess());
-                            }
-                        });
-            }
-        }*/
-
-
+        PutDataRequest request = dataMap.asPutDataRequest();
+        Wearable.DataApi.putDataItem(googleApiClient, request)
+                .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                    @Override
+                    public void onResult(DataApi.DataItemResult dataItemResult) {
+                        Log.i(TAG, "Sending image success: " + dataItemResult.getStatus().isSuccess());
+                    }
+                });
     }
 
     private static Asset toAsset(Bitmap bitmap) {
@@ -197,66 +186,9 @@ public class MListenerService extends WearableListenerService {
                 try {
                     byteStream.close();
                 } catch (IOException e) {
-                    // ignore
+                    // what?
                 }
             }
         }
-    }
-
-    private void downloadImages() {
-        Log.i(TAG, "Starting image download");
-        for (final MGoogleImage image : imageList) {
-            String imageUrl = image.getThumbnailLink();
-            Log.i(TAG, "URL: " + imageUrl);
-            ImageRequest request = new ImageRequest(imageUrl,
-                    new Response.Listener<Bitmap>() {
-                        @Override
-                        public void onResponse(Bitmap bitmap) {
-                            //mImageView.setImageBitmap(bitmap);
-                            image.setThumbnail(bitmap);
-                            sendImageToWatch(image);
-                        }
-                    }, 0, 0, null,
-                    new Response.ErrorListener() {
-                        public void onErrorResponse(VolleyError error) {
-//                            mImageView.setImageResource(R.drawable.image_load_error);
-                        }
-                    });
-            queue.add(request);
-        }
-    }
-
-    private void sendImageToWatch(MGoogleImage image) {
-        Log.i(TAG, "Sending image");
-        // Send the data
-//        if (mGoogleApiClient == null || !mGoogleApiClient.isConnected()) {
-//            mGoogleApiClient = new GoogleApiClient.Builder(this)
-//                    .addApi(Wearable.API)
-//                    .build();
-//
-//            ConnectionResult connectionResult = mGoogleApiClient.blockingConnect(30, TimeUnit.SECONDS);
-//
-//            if (!connectionResult.isSuccess()) {
-//                Log.e(TAG, String.format("GoogleApiClient connect failed with error code %d", connectionResult.getErrorCode()));
-//            } //else {
-        // Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.debug_background_4);
-
-        PutDataMapRequest dataMap = PutDataMapRequest.create("/image");
-
-        dataMap.getDataMap().putAsset("image", toAsset(image.getThumbnail()));
-        dataMap.getDataMap().putInt("index", image.getIndex());
-        dataMap.getDataMap().putLong("time", new Date().getTime());
-
-        PutDataRequest request = dataMap.asPutDataRequest();
-        Wearable.DataApi.putDataItem(mGoogleApiClient, request)
-                .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
-                    @Override
-                    public void onResult(DataApi.DataItemResult dataItemResult) {
-                        Log.i(TAG, "Sending image was successful: " + dataItemResult.getStatus()
-                                .isSuccess());
-                    }
-                });
-        //}
-        // }
     }
 }
