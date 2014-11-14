@@ -1,6 +1,8 @@
 package com.sassoni.urbanraccoon.wearimagesearch;
 
 
+import android.graphics.Bitmap;
+
 public class MGoogleImage {
 
     int index;
@@ -11,6 +13,7 @@ public class MGoogleImage {
     String contextLink;
     int byteSize;
     int width;
+    Bitmap thumbnail;
 
     public MGoogleImage(int index, String thumbnailLink, String contextLink) {
         this.index = index;
@@ -28,5 +31,13 @@ public class MGoogleImage {
 
     String getContextLink() {
         return thumbnailLink;
+    }
+
+    Bitmap getThumbnail() {
+        return thumbnail;
+    }
+
+    void setThumbnail(Bitmap thumbnail) {
+        this.thumbnail = thumbnail;
     }
 }
