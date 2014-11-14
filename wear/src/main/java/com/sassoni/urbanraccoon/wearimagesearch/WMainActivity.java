@@ -50,6 +50,8 @@ public class WMainActivity extends Activity {
     private TextView tapToSearchLabel;
     private GridViewPager gridViewPager;
 
+    private int positionInGrid = 0;
+
     // TODO Make a common module for constants
     public static String SEARCH_PATH = "/search";
 
@@ -232,7 +234,8 @@ public class WMainActivity extends Activity {
         protected void onPostExecute(Bitmap bitmap) {
             //TODO Check if bitmap is null
             Drawable drawable = new BitmapDrawable(getResources(), bitmap);
-            adapter.updateImageWithIndex(image.getIndex(), drawable);
+            adapter.updateImageWithIndex(/*image.getIndex()*/positionInGrid, drawable);
+            positionInGrid++;
         }
     }
 
