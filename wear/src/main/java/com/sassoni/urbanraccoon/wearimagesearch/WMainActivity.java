@@ -23,6 +23,10 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.Asset;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataEvent;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.MessageApi;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.NodeApi;
@@ -37,13 +41,14 @@ import java.util.concurrent.TimeUnit;
 // We don't really handle connection errors with the google api client here. Just because??
 // TODO Should we show something in case of any error?
 // TODO Test while disconnected
-public class WMainActivity extends Activity {
+// TODO onDestroy delete data in storage?
+public class WMainActivity extends Activity implements DataApi.DataListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     private static final String TAG = "***** WEAR: " + WMainActivity.class.getSimpleName();
 
     private GoogleApiClient mGoogleApiClient;
     private WImagesGridPagerAdapter adapter;
-    private DataChangedBroadcastReceiver dataChangedBroadcastReceiver;
+//    private DataChangedBroadcastReceiver dataChangedBroadcastReceiver;
     private static final int SPEECH_REQUEST_CODE = 10;
 
     private CircledImageView tapToSearchBtn;
@@ -68,24 +73,12 @@ public class WMainActivity extends Activity {
 //                mTextView = (TextView) stub.findViewById(R.id.text);
 //            }
 //        });
-        dataChangedBroadcastReceiver = new DataChangedBroadcastReceiver();
+//        dataChangedBroadcastReceiver = new DataChangedBroadcastReceiver();
 
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API)
-                .addConnectionCallbacks(new GoogleApiClient.ConnectionCallbacks() {
-                    @Override
-                    public void onConnected(Bundle bundle) {
-                    }
-
-                    @Override
-                    public void onConnectionSuspended(int i) {
-                    }
-                })
-                .addOnConnectionFailedListener(new GoogleApiClient.OnConnectionFailedListener() {
-                    @Override
-                    public void onConnectionFailed(ConnectionResult connectionResult) {
-                    }
-                })
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
                 .build();
 
         tapToSearchBtn = (CircledImageView) findViewById(R.id.main_tap_to_search_btn);
@@ -107,13 +100,16 @@ public class WMainActivity extends Activity {
     protected void onStart() {
         super.onStart();
         mGoogleApiClient.connect();
-        LocalBroadcastManager.getInstance(this).registerReceiver(dataChangedBroadcastReceiver, new IntentFilter(WConstants.ACTION_DATA_CHANGE));
+//        LocalBroadcastManager.getInstance(this).registerReceiver(dataChangedBroadcastReceiver, new IntentFilter(WConstants.ACTION_DATA_CHANGE));
     }
 
     @Override
     protected void onStop() {
-        mGoogleApiClient.disconnect();
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(dataChangedBroadcastReceiver);
+        if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
+            Wearable.DataApi.removeListener(mGoogleApiClient, this);
+            mGoogleApiClient.disconnect();
+        }
+//        LocalBroadcastManager.getInstance(this).unregisterReceiver(dataChangedBroadcastReceiver);
         super.onStop();
     }
 
@@ -177,6 +173,38 @@ public class WMainActivity extends Activity {
         return results;
     }
 
+    @Override
+    public void onDataChanged(DataEventBuffer dataEvents) {
+        Log.i(TAG, "Data Changed!");
+        for (DataEvent event : dataEvents) {
+            if (event.getType() == DataEvent.TYPE_CHANGED && event.getDataItem().getUri().getPath().equals("/image")) {
+                DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
+                Asset profileAsset = dataMapItem.getDataMap().getAsset("image");
+                int imageIndex = dataMapItem.getDataMap().getInt("index");
+
+                Log.i(TAG, "We got new image for index: " + imageIndex);
+
+                MyImage image = new MyImage(imageIndex, "url", profileAsset);
+                new SendImageToAdapterTask().execute(image);
+            }
+        }
+    }
+
+    @Override
+    public void onConnected(Bundle bundle) {
+        Wearable.DataApi.addListener(mGoogleApiClient, this);
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult connectionResult) {
+
+    }
+
     private class SendMessageTask extends AsyncTask<String, Void, Void> {
         @Override
         protected Void doInBackground(String... args) {
@@ -196,14 +224,14 @@ public class WMainActivity extends Activity {
         gridViewPager.setVisibility(View.VISIBLE);
     }
 
-    private class DataChangedBroadcastReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            Log.i(TAG, "Data Change broadcast received!");
-            MyImage image = (MyImage) intent.getParcelableExtra(WConstants.KEY_MY_IMAGE);
-            new SendImageToAdapterTask().execute(image);
-        }
-    }
+//    private class DataChangedBroadcastReceiver extends BroadcastReceiver {
+//        @Override
+//        public void onReceive(Context context, Intent intent) {
+//            Log.i(TAG, "Data Change broadcast received!");
+//            MyImage image = (MyImage) intent.getParcelableExtra(WConstants.KEY_MY_IMAGE);
+//            new SendImageToAdapterTask().execute(image);
+//        }
+//    }
 
     private class SendImageToAdapterTask extends AsyncTask<MyImage, Void, Bitmap> {
         MyImage image;
@@ -215,13 +243,8 @@ public class WMainActivity extends Activity {
                 // TODO Probably just return null here
                 throw new IllegalArgumentException("Asset must be non-null");
             }
-            ConnectionResult result = mGoogleApiClient.blockingConnect(10000, TimeUnit.MILLISECONDS);
-            if (!result.isSuccess()) {
-                return null;
-            }
-            // convert asset into a file descriptor and block until it's ready
+
             InputStream assetInputStream = Wearable.DataApi.getFdForAsset(mGoogleApiClient, asset).await().getInputStream();
-            mGoogleApiClient.disconnect();
 
             if (assetInputStream == null) {
                 Log.i(TAG, "Requested an unknown Asset.");
@@ -234,6 +257,7 @@ public class WMainActivity extends Activity {
         protected void onPostExecute(Bitmap bitmap) {
             //TODO Check if bitmap is null
             Drawable drawable = new BitmapDrawable(getResources(), bitmap);
+            Log.i(TAG, "Position in grid: " + positionInGrid);
             adapter.updateImageWithIndex(/*image.getIndex()*/positionInGrid, drawable);
             positionInGrid++;
         }
