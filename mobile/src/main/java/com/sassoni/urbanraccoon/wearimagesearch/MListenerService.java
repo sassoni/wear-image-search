@@ -21,6 +21,8 @@ import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 import com.google.android.gms.wearable.WearableListenerService;
+import com.sassoni.urbanraccoon.wearimagesearch.common.Common;
+import com.sassoni.urbanraccoon.wearimagesearch.common.Keys;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -111,9 +113,11 @@ public class MListenerService extends WearableListenerService {
                             JSONArray items = jsonObject.getJSONArray("items");
 
                             for (int i = 0; i < items.length(); i++) {
+                                Log.i(TAG, "Items length: " + items.length());
                                 JSONObject item = items.getJSONObject(i);
                                 JSONObject image = item.getJSONObject("image");
                                 MGoogleImage googleImage = new MGoogleImage(i, image.getString("thumbnailLink"), image.getString("contextLink"));
+//                                MGoogleImage googleImage = new MGoogleImage(i, item.getString("link"), image.getString("contextLink"));
                                 thumbnailList.add(googleImage);
                             }
                         } catch (JSONException e) {
@@ -142,6 +146,7 @@ public class MListenerService extends WearableListenerService {
                     new Response.Listener<Bitmap>() {
                         @Override
                         public void onResponse(Bitmap bitmap) {
+                            Log.i("BYTES", bitmap.getByteCount() + "");
                             image.setThumbnail(bitmap);
                             sendImageToWatch(image);
                         }
