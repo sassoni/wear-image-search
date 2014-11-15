@@ -1,18 +1,15 @@
 package com.sassoni.urbanraccoon.wearimagesearch;
 
 import android.app.Activity;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.speech.RecognizerIntent;
-import android.support.v4.content.LocalBroadcastManager;
 import android.support.wearable.view.CircledImageView;
 import android.support.wearable.view.GridViewPager;
 import android.util.Log;
@@ -21,6 +18,7 @@ import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.DataApi;
@@ -30,6 +28,7 @@ import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.MessageApi;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.NodeApi;
+import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 
 import java.io.InputStream;
@@ -48,7 +47,6 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
 
     private GoogleApiClient mGoogleApiClient;
     private WImagesGridPagerAdapter adapter;
-//    private DataChangedBroadcastReceiver dataChangedBroadcastReceiver;
     private static final int SPEECH_REQUEST_CODE = 10;
 
     private CircledImageView tapToSearchBtn;
@@ -100,7 +98,6 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
     protected void onStart() {
         super.onStart();
         mGoogleApiClient.connect();
-//        LocalBroadcastManager.getInstance(this).registerReceiver(dataChangedBroadcastReceiver, new IntentFilter(WConstants.ACTION_DATA_CHANGE));
     }
 
     @Override
@@ -109,8 +106,12 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
             Wearable.DataApi.removeListener(mGoogleApiClient, this);
             mGoogleApiClient.disconnect();
         }
-//        LocalBroadcastManager.getInstance(this).unregisterReceiver(dataChangedBroadcastReceiver);
         super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
     }
 
     private void sendMessage(String node, String message) {
@@ -151,11 +152,7 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
             Log.i(TAG, spokenText);
 
             // Send the query to the phone
-            new SendMessageTask().execute(spokenText);
-
-//            Intent myIntent = new Intent(WMainActivity.this, WImagesGridActivity.class);
-//            //myIntent.putExtra("key", value); //put the text as parameter
-//            startActivity(myIntent);
+            new SendKeywordToPhoneTask().execute(spokenText);
         }
         super.onActivityResult(requestCode, resultCode, data);
     }
@@ -178,6 +175,10 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
         Log.i(TAG, "Data Changed!");
         for (DataEvent event : dataEvents) {
             if (event.getType() == DataEvent.TYPE_CHANGED && event.getDataItem().getUri().getPath().equals("/image")) {
+                Log.i(TAG, "!!!!!!!!!!!Deleted!!!!!!!!!!!");
+            }
+
+            if (event.getType() == DataEvent.TYPE_CHANGED && event.getDataItem().getUri().getPath().equals("/image")) {
                 DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
                 Asset profileAsset = dataMapItem.getDataMap().getAsset("image");
                 int imageIndex = dataMapItem.getDataMap().getInt("index");
@@ -193,6 +194,18 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
     @Override
     public void onConnected(Bundle bundle) {
         Wearable.DataApi.addListener(mGoogleApiClient, this);
+
+        // Delete all previous data
+        Uri uri = new Uri.Builder().scheme(PutDataRequest.WEAR_URI_SCHEME).path("/image").build();
+
+        PendingResult<DataApi.DeleteDataItemsResult> deleteDataItemsResultPendingResult =
+                Wearable.DataApi.deleteDataItems(mGoogleApiClient, uri);
+        deleteDataItemsResultPendingResult.setResultCallback(new ResultCallback<DataApi.DeleteDataItemsResult>() {
+            @Override
+            public void onResult(DataApi.DeleteDataItemsResult deleteDataItemsResult) {
+
+            }
+        }, 2, TimeUnit.SECONDS);
     }
 
     @Override
@@ -205,7 +218,7 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
 
     }
 
-    private class SendMessageTask extends AsyncTask<String, Void, Void> {
+    private class SendKeywordToPhoneTask extends AsyncTask<String, Void, Void> {
         @Override
         protected Void doInBackground(String... args) {
             Log.i(TAG, "Start sending message...");
@@ -223,15 +236,6 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
         tapToSearchLabel.setVisibility(View.GONE);
         gridViewPager.setVisibility(View.VISIBLE);
     }
-
-//    private class DataChangedBroadcastReceiver extends BroadcastReceiver {
-//        @Override
-//        public void onReceive(Context context, Intent intent) {
-//            Log.i(TAG, "Data Change broadcast received!");
-//            MyImage image = (MyImage) intent.getParcelableExtra(WConstants.KEY_MY_IMAGE);
-//            new SendImageToAdapterTask().execute(image);
-//        }
-//    }
 
     private class SendImageToAdapterTask extends AsyncTask<MyImage, Void, Bitmap> {
         MyImage image;
