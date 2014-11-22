@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Wear Image Search</string>
+    <string name="instructions">Start the app on your watch by navigating to or by saying OK Google -> Image search</string>
 </resources>

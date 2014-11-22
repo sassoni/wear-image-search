@@ -21,8 +21,9 @@ import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 import com.google.android.gms.wearable.WearableListenerService;
-import com.sassoni.urbanraccoon.wearimagesearch.common.Common;
+import com.sassoni.urbanraccoon.wearimagesearch.common.Constants;
 import com.sassoni.urbanraccoon.wearimagesearch.common.Keys;
+import com.sassoni.urbanraccoon.wearimagesearch.common.MGoogleImage;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -98,7 +99,7 @@ public class MListenerService extends WearableListenerService {
         String url = "https://www.googleapis.com/customsearch/v1?searchType=image&key=" + Keys.API_KEY
                 + "&cx=" + Keys.CSE_CREATOR + ":" + Keys.CSE_ID
                 + "&q=" + encodedKeyword
-                + "&num=" + Common.IMAGE_LIMIT
+                + "&num=" + Constants.IMAGE_LIMIT
                 + "&start=" + searchStartIndex;
 
         JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null,
@@ -163,12 +164,12 @@ public class MListenerService extends WearableListenerService {
     private void sendImageToWatch(MGoogleImage image) {
         Log.i(TAG, "Sending image");
 
-        PutDataMapRequest dataMap = PutDataMapRequest.create(Common.PATH_IMAGE);
+        PutDataMapRequest dataMap = PutDataMapRequest.create(Constants.PATH_IMAGE);
 
-        dataMap.getDataMap().putAsset(Common.DMAP_KEY_IMAGE, toAsset(image.getThumbnail()));
-        dataMap.getDataMap().putInt(Common.DMAP_KEY_INDEX, image.getIndex());
-        dataMap.getDataMap().putString(Common.DMAP_KEY_CONTEXT_URL, image.getContextLink());
-        dataMap.getDataMap().putLong(Common.DMAP_KEY_TIME, new Date().getTime());
+        dataMap.getDataMap().putAsset(Constants.DMAP_KEY_IMAGE, toAsset(image.getThumbnail()));
+        dataMap.getDataMap().putInt(Constants.DMAP_KEY_INDEX, image.getIndex());
+        dataMap.getDataMap().putString(Constants.DMAP_KEY_CONTEXT_URL, image.getContextLink());
+        dataMap.getDataMap().putLong(Constants.DMAP_KEY_TIME, new Date().getTime());
 
         PutDataRequest request = dataMap.asPutDataRequest();
         Wearable.DataApi.putDataItem(googleApiClient, request)

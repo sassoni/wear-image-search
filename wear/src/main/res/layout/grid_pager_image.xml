@@ -3,23 +3,26 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white">
+    android:background="@color/material_light_gray">
 
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:contentDescription="@string/content_description_image" />
 
     <android.support.wearable.view.CircledImageView
         android:id="@+id/pager_visit_page_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
+        style="@style/circle_button_layout"
         android:src="@drawable/common_full_open_on_phone"
-        android:visibility="gone"
-        app:circle_color="@color/blue"
+        app:circle_color="@color/material_red"
         app:circle_radius="50dp"
-        app:circle_radius_pressed="60dp" />
+        app:circle_radius_pressed="55dp" />
+
+    <TextView
+        style="@style/circle_button_text"
+        android:layout_below="@id/pager_visit_page_btn"
+        android:text="@string/open_on_phone" />
 
     <ProgressBar
         android:id="@+id/pager_progress_bar"

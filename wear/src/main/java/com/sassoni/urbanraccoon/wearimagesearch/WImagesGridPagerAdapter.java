@@ -68,6 +68,13 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
             }
         } else {
             view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_pager_load_more, null);
+            CircledImageView loadMoreBtn = (CircledImageView) view.findViewById(R.id.pager_load_more_btn);
+            loadMoreBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Log.i(TAG, "Pressed!");
+                }
+            });
         }
 
         viewGroup.addView(view);
@@ -84,7 +91,7 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
         return view == o;
     }
 
-    public void updateImageWithIndex(int index, Drawable drawable){
+    public void updateImageWithIndex(int index, Drawable drawable) {
         WImagesGridPagerAdapter.imagesList.set(index, drawable);
         notifyDataSetChanged();
     }
