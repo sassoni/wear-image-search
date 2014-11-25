@@ -1,6 +1,7 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/grid_pager_view_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/material_light_gray">
@@ -11,23 +12,60 @@
         android:layout_height="match_parent"
         android:contentDescription="@string/content_description_image" />
 
-    <android.support.wearable.view.CircledImageView
-        android:id="@+id/pager_visit_page_btn"
-        style="@style/circle_button_layout"
-        android:src="@drawable/common_full_open_on_phone"
-        app:circle_color="@color/material_red"
-        app:circle_radius="50dp"
-        app:circle_radius_pressed="55dp" />
+    <View
+        android:id="@+id/overlay_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.5"
+        android:background="@color/black"
+        android:contentDescription="@string/content_description_image" />
 
-    <TextView
-        style="@style/circle_button_text"
-        android:layout_below="@id/pager_visit_page_btn"
-        android:text="@string/open_on_phone" />
+    <LinearLayout
+        android:id="@+id/open_on_phone_layout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:orientation="vertical">
+
+        <android.support.wearable.view.CircledImageView
+            android:id="@+id/open_on_phone_circle"
+            style="@style/circle_button_layout"
+            android:src="@drawable/common_full_open_on_phone"
+            app:circle_color="@color/material_red"
+            app:circle_radius="@dimen/circle_radius"
+            app:circle_radius_pressed="@dimen/circle_radius_pressed" />
+
+        <TextView
+            android:id="@+id/open_on_phone_text"
+            style="@style/circle_button_label"
+            android:text="@string/open_on_phone" />
+    </LinearLayout>
 
     <ProgressBar
-        android:id="@+id/pager_progress_bar"
+        android:id="@+id/progress_bar"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true" />
+
+    <LinearLayout
+        android:id="@+id/load_more_layout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:orientation="vertical">
+
+        <android.support.wearable.view.CircledImageView
+            android:id="@+id/load_more_circle"
+            style="@style/circle_button_layout"
+            android:src="@drawable/icon_more"
+            app:circle_color="@color/material_red"
+            app:circle_radius="@dimen/circle_radius"
+            app:circle_radius_pressed="@dimen/circle_radius_pressed" />
+
+        <TextView
+            android:id="@+id/load_more_text"
+            style="@style/circle_button_label"
+            android:text="@string/load_more" />
+    </LinearLayout>
 
 </RelativeLayout>

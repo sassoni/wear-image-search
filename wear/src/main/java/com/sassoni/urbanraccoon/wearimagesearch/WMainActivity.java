@@ -34,6 +34,7 @@ import com.sassoni.urbanraccoon.wearimagesearch.common.Constants;
 import com.sassoni.urbanraccoon.wearimagesearch.common.MGoogleImage;
 
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -44,7 +45,10 @@ import java.util.concurrent.TimeUnit;
 // TODO Test while disconnected
 // TODO onDestroy delete data in storage?
 // TODO Remove + from buildfile
-public class WMainActivity extends Activity implements DataApi.DataListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+public class WMainActivity extends Activity implements DataApi.DataListener,
+        GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener,
+        WImagesGridPagerAdapter.MoreButtonClickedListener {
 
     private static final String TAG = "***** WEAR: " + WMainActivity.class.getSimpleName();
 
@@ -57,6 +61,11 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
     private GridViewPager gridViewPager;
 
     private int positionInGrid = 0;
+    private int requestIndex = 1;
+
+    private String spokenText;
+
+    private static List<Drawable> imagesList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,9 +90,24 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
 
         tapToSearchLabel = (TextView) findViewById(R.id.main_tap_to_search_label);
 
+        imagesList = new ArrayList<Drawable>();
+        addToList(10);
+
         gridViewPager = (GridViewPager) findViewById(R.id.main_grid_view_pager);
-        adapter = new WImagesGridPagerAdapter(this);
+        adapter = new WImagesGridPagerAdapter(this, imagesList);
         gridViewPager.setAdapter(adapter);
+    }
+
+    private void addToList(int howMany){
+        for (int i = 0; i < howMany; i++) {
+            imagesList.add(null);
+        }
+    }
+
+    private void updateImageWithIndex(int index, Drawable drawable) {
+//        imagesList.set(index, drawable);
+        imagesList.set(index, drawable);
+        adapter.notifyDataSetChanged();
     }
 
     @Override
@@ -150,14 +174,26 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
             // TODO Is it better to convert this to a new fragment?
             switchToGridView();
             List<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-            String spokenText = results.get(0);
+            spokenText = results.get(0);
 
             Log.i(TAG, spokenText);
 
             // Send the query to the phone
+            requestIndex = 1;
             new SendKeywordToPhoneTask().execute(spokenText);
         } // else show an error?
         super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    @Override
+    public void onMoreButtonClicked() {
+//        adapter.increaseSize();
+        gridViewPager.getAdapter().notifyDataSetChanged();
+        gridViewPager.setOffscreenPageCount(20);
+
+//        gridViewPager.setAdapter(adapter);
+        //adapter.notifyDataSetChanged();
+        sendRequestForMore();
     }
 
     // ----- Keyword to Phone ----- //
@@ -175,10 +211,18 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
         }
     }
 
+    private void sendRequestForMore() {
+        Log.i(TAG, "Requesting more");
+        requestIndex++;
+        new SendKeywordToPhoneTask().execute(spokenText);
+    }
+
     private void sendMessage(String node, String message) {
         Log.i(TAG, "Sending message");
+
+        String specificPath = Constants.SEARCH_KEY_PATH + "/" + requestIndex;
         Wearable.MessageApi.sendMessage(
-                mGoogleApiClient, node, Constants.SEARCH_KEY_PATH, message.getBytes()).setResultCallback(
+                mGoogleApiClient, node, specificPath, message.getBytes()).setResultCallback(
                 new ResultCallback<MessageApi.SendMessageResult>() {
                     @Override
                     public void onResult(MessageApi.SendMessageResult sendMessageResult) {
@@ -262,7 +306,8 @@ public class WMainActivity extends Activity implements DataApi.DataListener, Goo
             //TODO Check if bitmap is null
             Drawable drawable = new BitmapDrawable(getResources(), bitmap);
             Log.i(TAG, "Position in grid: " + positionInGrid);
-            adapter.updateImageWithIndex(/*image.getIndex()*/positionInGrid, drawable);
+//            adapter.updateImageWithIndex(/*image.getIndex()*/positionInGrid, drawable);
+            updateImageWithIndex(/*image.getIndex()*/positionInGrid, drawable);
             positionInGrid++;
         }
     }

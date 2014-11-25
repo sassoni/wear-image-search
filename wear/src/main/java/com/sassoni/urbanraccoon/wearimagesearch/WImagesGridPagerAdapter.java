@@ -1,5 +1,6 @@
 package com.sassoni.urbanraccoon.wearimagesearch;
 
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.drawable.Drawable;
 import android.support.wearable.view.CircledImageView;
@@ -9,9 +10,10 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class WImagesGridPagerAdapter extends GridPagerAdapter {
@@ -19,60 +21,87 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
     private static final String TAG = "***** WEAR: " + WImagesGridPagerAdapter.class.getSimpleName();
 
     private Context context;
-    private static List<Drawable> imagesList;
+    private List<Drawable> list;
+    private int numOfCols = 2;
 
-    public WImagesGridPagerAdapter(Context context) {
-        this.context = context;
-        imagesList = new ArrayList<Drawable>();
-        for (int i = 0; i < 10; i++) {
-            imagesList.add(null);
-        }
+    public interface MoreButtonClickedListener {
+        public void onMoreButtonClicked();
+    }
+
+    MoreButtonClickedListener moreButtonClickedListener;
+
+    public WImagesGridPagerAdapter(Activity activity, List<Drawable> list) {
+        this.context = activity;
+        this.list = list;
+        moreButtonClickedListener = (MoreButtonClickedListener) activity;
     }
 
     @Override
     public int getRowCount() {
-        return 11;
+        return list.size();
     }
 
     @Override
-    public int getColumnCount(int i) {
-        return 2;
+    public int getColumnCount(int row) {
+        if (row != list.size() - 1) {
+            return 2;
+        } else {
+            return 1;
+        }
     }
 
     @Override
     protected Object instantiateItem(ViewGroup viewGroup, int row, int col) {
-        Log.i(TAG, "instantiateItem");
+        Log.i(TAG, "instantiateItem in row:" + row);
 
-        View view;
+        View view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_pager_image, viewGroup, false);
 
-        if (row != 10) {
-            view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_pager_image, null);
-//        final View view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_pager_image, viewGroup, false);
-            ImageView imageView = (ImageView) view.findViewById(R.id.imageView);
-            CircledImageView circledImageView = (CircledImageView) view.findViewById(R.id.pager_visit_page_btn);
-            ProgressBar progressBar = (ProgressBar) view.findViewById(R.id.pager_progress_bar);
-            if (imagesList.get(row) != null) {
+        RelativeLayout gridPagerView = (RelativeLayout) view.findViewById(R.id.grid_pager_view_layout);
+        LinearLayout openOnPhoneLayout = (LinearLayout) view.findViewById(R.id.open_on_phone_layout);
+        LinearLayout loadMoreLayout = (LinearLayout) view.findViewById(R.id.load_more_layout);
+        ImageView imageView = (ImageView) view.findViewById(R.id.imageView);
+        View overlayView = view.findViewById(R.id.overlay_view);
+        ProgressBar progressBar = (ProgressBar) view.findViewById(R.id.progress_bar);
+
+        gridPagerView.setBackgroundColor(context.getResources().getColor(R.color.material_light_gray));
+
+        if (row != list.size() - 1) {
+            loadMoreLayout.setVisibility(View.GONE);
+
+            if (list.get(row) != null) {
                 imageView.setVisibility(View.VISIBLE);
-                imageView.setBackground(imagesList.get(row));
                 progressBar.setVisibility(View.GONE);
+                imageView.setBackground(list.get(row));
             } else {
                 imageView.setVisibility(View.GONE);
                 progressBar.setVisibility(View.VISIBLE);
             }
+
             if (col == 0) {
-                imageView.setAlpha(1.0f);
-                circledImageView.setVisibility(View.GONE);
+                imageView.setVisibility(View.VISIBLE);
+                overlayView.setVisibility(View.GONE);
+                openOnPhoneLayout.setVisibility(View.GONE);
             } else {
-                imageView.setAlpha(0.4f);
-                circledImageView.setVisibility(View.VISIBLE);
+                imageView.setVisibility(View.GONE);
+                overlayView.setVisibility(View.VISIBLE);
+                openOnPhoneLayout.setVisibility(View.VISIBLE);
             }
-        } else {
-            view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_pager_load_more, null);
-            CircledImageView loadMoreBtn = (CircledImageView) view.findViewById(R.id.pager_load_more_btn);
+        } else {  // Final row
+            imageView.setVisibility(View.GONE);
+            overlayView.setVisibility(View.GONE);
+            progressBar.setVisibility(View.GONE);
+            openOnPhoneLayout.setVisibility(View.GONE);
+            loadMoreLayout.setVisibility(View.VISIBLE);
+            gridPagerView.setBackgroundColor(context.getResources().getColor(R.color.material_gray));
+
+            CircledImageView loadMoreBtn = (CircledImageView) view.findViewById(R.id.load_more_circle);
             loadMoreBtn.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     Log.i(TAG, "Pressed!");
+                    if (moreButtonClickedListener != null) {
+                        moreButtonClickedListener.onMoreButtonClicked();
+                    }
                 }
             });
         }
@@ -89,11 +118,6 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
     @Override
     public boolean isViewFromObject(View view, Object o) {
         return view == o;
-    }
-
-    public void updateImageWithIndex(int index, Drawable drawable) {
-        WImagesGridPagerAdapter.imagesList.set(index, drawable);
-        notifyDataSetChanged();
     }
 
 }

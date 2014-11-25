@@ -48,7 +48,7 @@ public class MListenerService extends WearableListenerService {
 
     private GoogleApiClient googleApiClient;
     private RequestQueue requestQueue;
-    private static int searchStartIndex = 1;
+    //private int searchStartIndex = 1;
 
     @Override
     public void onCreate() {
@@ -71,24 +71,42 @@ public class MListenerService extends WearableListenerService {
 
         Log.i(TAG, "Message received: " + new String(messageEvent.getData()));
 
-        if (googleApiClient == null || !googleApiClient.isConnected()) {
-            googleApiClient = new GoogleApiClient.Builder(this)
-                    .addApi(Wearable.API)
-                    .build();
-        }
-        ConnectionResult connectionResult = googleApiClient.blockingConnect(30, TimeUnit.SECONDS);
+        String path = messageEvent.getPath();
 
-        if (!connectionResult.isSuccess()) {
-            Log.i(TAG, "GoogleApiClient connect failed with error code " + connectionResult.getErrorCode());
-            // anything else?
+        if (path.contains(Constants.SEARCH_KEY_PATH)) {
+
+            Log.i(TAG, "YES!");
+
+            if (googleApiClient == null || !googleApiClient.isConnected()) {
+                googleApiClient = new GoogleApiClient.Builder(this)
+                        .addApi(Wearable.API)
+                        .build();
+            }
+            ConnectionResult connectionResult = googleApiClient.blockingConnect(30, TimeUnit.SECONDS);
+
+            if (!connectionResult.isSuccess()) {
+                Log.i(TAG, "GoogleApiClient connect failed with error code " + connectionResult.getErrorCode());
+                // anything else?
+            } else {
+                //(x)1->(y)1
+                //2->11
+                //3->21
+                //y=1+(x-1)*10
+                String[] splitPath = path.split("/");
+                int searchStartIndex = 1 + ( Integer.parseInt(splitPath[2]) - 1 ) * 10;
+
+                Log.i(TAG, searchStartIndex+"");
+
+                requestQueue = Volley.newRequestQueue(this);
+                String keyword = new String(messageEvent.getData());
+                requestImagesFor(keyword, searchStartIndex);
+            }
         } else {
-            requestQueue = Volley.newRequestQueue(this);
-            String keyword = new String(messageEvent.getData());
-            requestImagesFor(keyword);
+            Log.i(TAG, "NO!");
         }
     }
 
-    private void requestImagesFor(String keyword) {
+    private void requestImagesFor(String keyword, final int searchStartIndex) {
         String encodedKeyword = "";
         try {
             encodedKeyword = URLEncoder.encode(keyword, "UTF-8");
@@ -101,6 +119,8 @@ public class MListenerService extends WearableListenerService {
                 + "&q=" + encodedKeyword
                 + "&num=" + Constants.IMAGE_LIMIT
                 + "&start=" + searchStartIndex;
+
+        Log.i(TAG, "url: " + url);
 
         JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null,
                 new Response.Listener<JSONObject>() {
@@ -117,7 +137,7 @@ public class MListenerService extends WearableListenerService {
                                 Log.i(TAG, "Items length: " + items.length());
                                 JSONObject item = items.getJSONObject(i);
                                 JSONObject image = item.getJSONObject("image");
-                                MGoogleImage googleImage = new MGoogleImage(i, image.getString("thumbnailLink"), image.getString("contextLink"));
+                                MGoogleImage googleImage = new MGoogleImage(searchStartIndex+i-1, image.getString("thumbnailLink"), image.getString("contextLink"));
 //                                MGoogleImage googleImage = new MGoogleImage(i, item.getString("link"), image.getString("contextLink"));
                                 thumbnailList.add(googleImage);
                             }

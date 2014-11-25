@@ -2,18 +2,21 @@
 <resources>
 
     <style name="circle_button_layout">
-        <item name="android:layout_width">110dp</item>
-        <item name="android:layout_height">110dp</item>
-        <item name="android:layout_centerInParent">true</item>
+        <item name="android:layout_width">104dp</item>
+        <item name="android:layout_height">104dp</item>
+        <item name="android:layout_gravity">center_horizontal</item>
+        <item name="android:padding">10dp</item>
     </style>
 
-    <style name="circle_button_text">
+    <style name="circle_button_label">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_centerInParent">true</item>
         <item name="android:layout_marginTop">10dp</item>
-        <item name="android:textColor">@color/material_dark_gray</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:layout_gravity">center_horizontal</item>
         <item name="android:gravity">center</item>
+        <item name="android:fontFamily">sans-serif-light</item>
     </style>
 
 </resources>
