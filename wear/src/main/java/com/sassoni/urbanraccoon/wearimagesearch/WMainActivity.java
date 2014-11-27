@@ -6,19 +6,19 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.speech.RecognizerIntent;
 import android.support.wearable.view.CircledImageView;
 import android.support.wearable.view.GridViewPager;
 import android.util.Log;
 import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.DataApi;
@@ -28,7 +28,6 @@ import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.MessageApi;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.NodeApi;
-import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 import com.sassoni.urbanraccoon.wearimagesearch.common.Constants;
 import com.sassoni.urbanraccoon.wearimagesearch.common.MGoogleImage;
@@ -38,34 +37,36 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
-// We don't really handle connection errors with the google api client here. Just because??
-// TODO Should we show something in case of any error?
 // TODO Test while disconnected
 // TODO onDestroy delete data in storage?
 // TODO Remove + from buildfile
+// TODO stop requests on destroy
+// TODO add timeout in request
+// TODO Is it better to convert views to a new fragment?
+// TODO Test which language model works better
+// TODO Phone should send the search ter mback to check against it
 public class WMainActivity extends Activity implements DataApi.DataListener,
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        WImagesGridPagerAdapter.MoreButtonClickedListener {
+        WImagesGridPagerAdapter.ButtonClickedListener {
 
     private static final String TAG = "***** WEAR: " + WMainActivity.class.getSimpleName();
 
-    private GoogleApiClient mGoogleApiClient;
-    private WImagesGridPagerAdapter adapter;
-    private static final int SPEECH_REQUEST_CODE = 10;
-
-    private CircledImageView tapToSearchBtn;
-    private TextView tapToSearchLabel;
-    private GridViewPager gridViewPager;
+    private static final int SPEECH_REQUEST_CODE = 42;
 
     private int positionInGrid = 0;
     private int requestIndex = 1;
 
-    private String spokenText;
+    private GoogleApiClient mGoogleApiClient;
+    private WImagesGridPagerAdapter adapter;
+    private int imagesIndices[];
+    private List<MGoogleImage> imagesList;
+    private String searchTerm;
 
-    private static List<Drawable> imagesList;
+    private LinearLayout tapToSearchLayout;
+    private GridViewPager gridViewPager;
+    private TextView errorMessage;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -74,13 +75,11 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addApi(Wearable.API)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .build();
+        tapToSearchLayout = (LinearLayout) findViewById(R.id.tap_to_search_layout);
+        gridViewPager = (GridViewPager) findViewById(R.id.main_grid_view_pager);
+        errorMessage = (TextView) findViewById(R.id.error_message);
 
-        tapToSearchBtn = (CircledImageView) findViewById(R.id.main_tap_to_search_btn);
+        CircledImageView tapToSearchBtn = (CircledImageView) findViewById(R.id.tap_to_search_circle);
         tapToSearchBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -88,26 +87,20 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
             }
         });
 
-        tapToSearchLabel = (TextView) findViewById(R.id.main_tap_to_search_label);
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addApi(Wearable.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .build();
 
-        imagesList = new ArrayList<Drawable>();
-        addToList(10);
+        imagesIndices = new int[Constants.MAX_IMAGES_TOTAL];
 
-        gridViewPager = (GridViewPager) findViewById(R.id.main_grid_view_pager);
+        imagesList = new ArrayList<MGoogleImage>();
+        growListBy(Constants.MAX_IMAGES_PER_REQUEST);
+
+//        adapter = new WImagesGridPagerAdapter(this, imagesList);
         adapter = new WImagesGridPagerAdapter(this, imagesList);
         gridViewPager.setAdapter(adapter);
-    }
-
-    private void addToList(int howMany){
-        for (int i = 0; i < howMany; i++) {
-            imagesList.add(null);
-        }
-    }
-
-    private void updateImageWithIndex(int index, Drawable drawable) {
-//        imagesList.set(index, drawable);
-        imagesList.set(index, drawable);
-        adapter.notifyDataSetChanged();
     }
 
     @Override
@@ -135,33 +128,22 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
     @Override
     public void onConnected(Bundle bundle) {
         Wearable.DataApi.addListener(mGoogleApiClient, this);
-
-        // Delete all previous data
-        Uri uri = new Uri.Builder().scheme(PutDataRequest.WEAR_URI_SCHEME).path(Constants.PATH_IMAGE).build();
-
-        PendingResult<DataApi.DeleteDataItemsResult> deleteDataItemsResultPendingResult =
-                Wearable.DataApi.deleteDataItems(mGoogleApiClient, uri);
-        deleteDataItemsResultPendingResult.setResultCallback(new ResultCallback<DataApi.DeleteDataItemsResult>() {
-            @Override
-            public void onResult(DataApi.DeleteDataItemsResult deleteDataItemsResult) {
-
-            }
-        }, 2, TimeUnit.SECONDS);
     }
 
     @Override
-    public void onConnectionSuspended(int i) {
+    public void onConnectionSuspended(int cause) {
+        showErrorMessage();
     }
 
     @Override
     public void onConnectionFailed(ConnectionResult connectionResult) {
+        showErrorMessage();
     }
 
     // ----- Speech Request ----- //
 
     private void startSpeechRecognizer() {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        // TODO Test which language model works better
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
 //        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH);
 //        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Testing prompt");  // not working?
@@ -171,80 +153,65 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK) {
-            // TODO Is it better to convert this to a new fragment?
             switchToGridView();
+
             List<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-            spokenText = results.get(0);
+            searchTerm = results.get(0);
+            Log.i(TAG, searchTerm);
 
-            Log.i(TAG, spokenText);
-
-            // Send the query to the phone
-            requestIndex = 1;
-            new SendKeywordToPhoneTask().execute(spokenText);
-        } // else show an error?
+            new SendRequestForSearchTermTask().execute();
+        } else {
+            showErrorMessage();
+        }
         super.onActivityResult(requestCode, resultCode, data);
     }
 
-    @Override
-    public void onMoreButtonClicked() {
-//        adapter.increaseSize();
-        gridViewPager.getAdapter().notifyDataSetChanged();
-        gridViewPager.setOffscreenPageCount(20);
+    // ----- Sending data ----- //
 
-//        gridViewPager.setAdapter(adapter);
-        //adapter.notifyDataSetChanged();
-        sendRequestForMore();
-    }
-
-    // ----- Keyword to Phone ----- //
-
-    private class SendKeywordToPhoneTask extends AsyncTask<String, Void, Void> {
+    private class SendRequestForSearchTermTask extends AsyncTask<Void, Void, Void> {
         @Override
-        protected Void doInBackground(String... args) {
+        protected Void doInBackground(Void... args) {
             Log.i(TAG, "Start sending message...");
             Collection<String> nodes = getNodes();
-            for (String node : nodes) {
-                Log.i(TAG, "... to node: " + node);
-                sendMessage(node, args[0]);
+            if (nodes.isEmpty()) {
+                showErrorMessage();
+            } else {
+                for (String node : nodes) {
+                    Log.i(TAG, "... to node: " + node);
+                    sendRequestForSearchTerm(node);
+                }
             }
             return null;
         }
     }
 
-    private void sendRequestForMore() {
-        Log.i(TAG, "Requesting more");
-        requestIndex++;
-        new SendKeywordToPhoneTask().execute(spokenText);
-    }
-
-    private void sendMessage(String node, String message) {
+    private void sendRequestForSearchTerm(String node) {
         Log.i(TAG, "Sending message");
 
-        String specificPath = Constants.SEARCH_KEY_PATH + "/" + requestIndex;
-        Wearable.MessageApi.sendMessage(
-                mGoogleApiClient, node, specificPath, message.getBytes()).setResultCallback(
-                new ResultCallback<MessageApi.SendMessageResult>() {
-                    @Override
-                    public void onResult(MessageApi.SendMessageResult sendMessageResult) {
-                        if (!sendMessageResult.getStatus().isSuccess()) {
-                            Log.i(TAG, "Failed to send message with status code: "
-                                    + sendMessageResult.getStatus().getStatusCode());
-                        } else {
-                            Log.i(TAG, "Sent message successfully ");
-                        }
-                    }
-                }
-        );
+        String specificPath = Constants.PATH_SEARCH + "/" + requestIndex;
+        Wearable.MessageApi.sendMessage(mGoogleApiClient, node, specificPath, searchTerm.getBytes())
+                .setResultCallback(new ResultCallback<MessageApi.SendMessageResult>() {
+                                       @Override
+                                       public void onResult(MessageApi.SendMessageResult sendMessageResult) {
+                                           if (!sendMessageResult.getStatus().isSuccess()) {
+                                               Log.i(TAG, "Failed to send message with status code: "
+                                                       + sendMessageResult.getStatus().getStatusCode());
+                                           } else {
+                                               Log.i(TAG, "Sent message successfully ");
+                                           }
+                                       }
+                                   }
+                );
     }
 
     private Collection<String> getNodes() {
         HashSet<String> results = new HashSet<String>();
-        NodeApi.GetConnectedNodesResult nodes =
-                Wearable.NodeApi.getConnectedNodes(mGoogleApiClient).await();
+        NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi.getConnectedNodes(mGoogleApiClient).await();
 
-        //  nodes might be null here?
-        for (Node node : nodes.getNodes()) {
-            results.add(node.getId());
+        if (nodes != null) {
+            for (Node node : nodes.getNodes()) {
+                results.add(node.getId());
+            }
         }
 
         return results;
@@ -256,61 +223,161 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
     public void onDataChanged(DataEventBuffer dataEvents) {
         Log.i(TAG, "Data Changed!");
         for (DataEvent event : dataEvents) {
-            if (event.getType() == DataEvent.TYPE_CHANGED && event.getDataItem().getUri().getPath().equals(Constants.PATH_IMAGE)) {
-                Log.i(TAG, "!!!!!!!!!!!Deleted!!!!!!!!!!!");
-            }
-
-            if (event.getType() == DataEvent.TYPE_CHANGED && event.getDataItem().getUri().getPath().equals(Constants.PATH_IMAGE)) {
+            if (event.getType() == DataEvent.TYPE_CHANGED &&
+                    event.getDataItem().getUri().getPath().equals(Constants.PATH_IMAGE)) {
                 DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
-                Asset profileAsset = dataMapItem.getDataMap().getAsset("image");
-                int imageIndex = dataMapItem.getDataMap().getInt("index");
 
-                Log.i(TAG, "We got new image for index: " + imageIndex);
+                String searchTermForData = dataMapItem.getDataMap().getString(Constants.DMAP_KEY_SEARCH_TERM);
 
-                MGoogleImage mGoogleImage = new MGoogleImage(imageIndex, null, "url");
-                mGoogleImage.setAsset(profileAsset);
+                if (searchTermForData.equals(searchTerm)) {  // Ignore any old requests
+                    Asset profileAsset = dataMapItem.getDataMap().getAsset(Constants.DMAP_KEY_IMAGE);
+                    int imageIndex = dataMapItem.getDataMap().getInt(Constants.DMAP_KEY_INDEX);
+                    String contextUrl = dataMapItem.getDataMap().getString(Constants.DMAP_KEY_CONTEXT_URL);
+
+                    Log.i(TAG, "We got new image for index: " + imageIndex);
+                    Log.i(TAG, "wih context urlx: " + contextUrl);
+                    MGoogleImage mGoogleImage = new MGoogleImage(imageIndex, null, contextUrl);
+                    mGoogleImage.setAsset(profileAsset);
 //                MyImage image = new MyImage(imageIndex, "url", profileAsset);
-                new SendImageToAdapterTask().execute(mGoogleImage);
+                    new DecodeAndShowImageTask().execute(mGoogleImage);
+                }
             }
         }
     }
 
+    // ----- Buttons in gridpager actions ----- //
+
+    @Override
+    public void onButtonClicked(int buttonId, int row) {
+
+        if (buttonId == WImagesGridPagerAdapter.BUTTON_LOAD_MORE) {
+            loadMore();
+        } else if (buttonId == WImagesGridPagerAdapter.BUTTON_OPEN_ON_PHONE) {
+            openOnPhone(row);
+        }
+    }
+
+    private void loadMore() {
+        requestIndex += Constants.MAX_IMAGES_PER_REQUEST;
+
+        growListBy(Constants.MAX_IMAGES_PER_REQUEST);
+
+        // See http://stackoverflow.com/questions/24742427/dynamically-adding-items-to-fragmentgridpageradapter
+        adapter = null;
+//        adapter = new WImagesGridPagerAdapter(this, imagesList);
+        adapter = new WImagesGridPagerAdapter(this, imagesList);
+        gridViewPager.setAdapter(adapter);
+
+        // See https://code.google.com/p/android/issues/detail?id=75309
+        Runnable setCurrentItemDelayed = new Runnable() {
+            @Override
+            public void run() {
+                gridViewPager.setCurrentItem(requestIndex - 1, 0, false);
+            }
+        };
+        Handler handler = new Handler();
+        handler.postDelayed(setCurrentItemDelayed, 100);
+
+        new SendRequestForSearchTermTask().execute();
+    }
+
+    private void openOnPhone(int rowClicked) {
+        int imageIndex = imagesIndices[rowClicked];
+        MGoogleImage image = imagesList.get(imageIndex);
+        String link = image.getContextLink();
+
+        new SendOpenOnPhoneMessageTask().execute(link);
+    }
+
+    private class SendOpenOnPhoneMessageTask extends AsyncTask<String, Void, Void> {
+        @Override
+        protected Void doInBackground(String... args) {
+            String link = args[0];
+            Log.i(TAG, "Link:---------" + link);
+            Log.i(TAG, "Start sending message...");
+            Collection<String> nodes = getNodes();
+            if (nodes.isEmpty()) {
+                showErrorMessage();
+            } else {
+                for (String node : nodes) {
+                    Log.i(TAG, "... to node: " + node);
+                    sendOpenOnPhoneMessage(node, link);
+                }
+            }
+            return null;
+        }
+    }
+
+    private void sendOpenOnPhoneMessage(String node, String link) {
+        Log.i(TAG, "Sending message");
+
+        Wearable.MessageApi.sendMessage(mGoogleApiClient, node, Constants.PATH_OPEN, link.getBytes())
+                .setResultCallback(new ResultCallback<MessageApi.SendMessageResult>() {
+                                       @Override
+                                       public void onResult(MessageApi.SendMessageResult sendMessageResult) {
+                                           if (!sendMessageResult.getStatus().isSuccess()) {
+                                               Log.i(TAG, "Failed to send message with status code: "
+                                                       + sendMessageResult.getStatus().getStatusCode());
+                                           } else {
+                                               Log.i(TAG, "Sent message successfully ");
+                                           }
+                                       }
+                                   }
+                );
+    }
+
+    private void growListBy(int howMany) {
+        for (int i = 0; i < howMany; i++) {
+            imagesList.add(null);
+        }
+    }
+
+    // ----- UI changes ----- //
+
+    private void showErrorMessage() {
+        tapToSearchLayout.setVisibility(View.GONE);
+        gridViewPager.setVisibility(View.GONE);
+        errorMessage.setVisibility(View.VISIBLE);
+    }
+
     private void switchToGridView() {
-        tapToSearchBtn.setVisibility(View.GONE);
-        tapToSearchLabel.setVisibility(View.GONE);
+        tapToSearchLayout.setVisibility(View.GONE);
         gridViewPager.setVisibility(View.VISIBLE);
     }
 
-    private class SendImageToAdapterTask extends AsyncTask<MGoogleImage, Void, Bitmap> {
+    private class DecodeAndShowImageTask extends AsyncTask<MGoogleImage, Void, Bitmap> {
         MGoogleImage image;
 
         protected Bitmap doInBackground(MGoogleImage... images) {
             image = images[0];
+
             Asset asset = image.getAsset();
             if (asset == null) {
-                // TODO Probably just return null here
-                throw new IllegalArgumentException("Asset must be non-null");
+                return null;
             }
 
             InputStream assetInputStream = Wearable.DataApi.getFdForAsset(mGoogleApiClient, asset).await().getInputStream();
-
             if (assetInputStream == null) {
-                Log.i(TAG, "Requested an unknown Asset.");
                 return null;
             }
-            // decode the stream into a bitmap
+
             return BitmapFactory.decodeStream(assetInputStream);
         }
 
         protected void onPostExecute(Bitmap bitmap) {
-            //TODO Check if bitmap is null
-            Drawable drawable = new BitmapDrawable(getResources(), bitmap);
             Log.i(TAG, "Position in grid: " + positionInGrid);
-//            adapter.updateImageWithIndex(/*image.getIndex()*/positionInGrid, drawable);
-            updateImageWithIndex(/*image.getIndex()*/positionInGrid, drawable);
-            positionInGrid++;
+
+            if (bitmap != null) {
+                Drawable drawable = new BitmapDrawable(getResources(), bitmap);
+                // We use positionInGrid instead of image index so that
+                // the images are shown based on the order they came
+                image.setDrawable(drawable);
+                imagesList.set(positionInGrid, image);
+                adapter.notifyDataSetChanged();
+                imagesIndices[positionInGrid] = image.getIndex();
+                positionInGrid++;
+            }
         }
     }
 
 }
-

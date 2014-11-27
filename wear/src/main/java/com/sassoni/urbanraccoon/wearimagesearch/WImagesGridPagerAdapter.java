@@ -14,44 +14,56 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 
+import com.sassoni.urbanraccoon.wearimagesearch.common.Constants;
+import com.sassoni.urbanraccoon.wearimagesearch.common.MGoogleImage;
+
 import java.util.List;
 
 public class WImagesGridPagerAdapter extends GridPagerAdapter {
 
     private static final String TAG = "***** WEAR: " + WImagesGridPagerAdapter.class.getSimpleName();
 
-    private Context context;
-    private List<Drawable> list;
-    private int numOfCols = 2;
+    public static final int BUTTON_LOAD_MORE = 11;
+    public static final int BUTTON_OPEN_ON_PHONE = 12;
 
-    public interface MoreButtonClickedListener {
-        public void onMoreButtonClicked();
+    private Context context;
+    private List<MGoogleImage> list;
+
+    public interface ButtonClickedListener {
+        public void onButtonClicked(int buttonId, int row);
     }
 
-    MoreButtonClickedListener moreButtonClickedListener;
+    ButtonClickedListener buttonClickedListener;
 
-    public WImagesGridPagerAdapter(Activity activity, List<Drawable> list) {
+//    public WImagesGridPagerAdapter(Activity activity, List<Drawable> list) {
+    public WImagesGridPagerAdapter(Activity activity, List<MGoogleImage> list) {
         this.context = activity;
         this.list = list;
-        moreButtonClickedListener = (MoreButtonClickedListener) activity;
+        buttonClickedListener = (ButtonClickedListener) activity;
     }
 
     @Override
     public int getRowCount() {
-        return list.size();
-    }
-
-    @Override
-    public int getColumnCount(int row) {
-        if (row != list.size() - 1) {
-            return 2;
+        // Stop showing 'more' when images images reach Constants.MAX_IMAGES_TOTAL
+        if (list.size() < Constants.MAX_IMAGES_TOTAL) {
+            return list.size() + 1;
         } else {
-            return 1;
+            return list.size();
         }
     }
 
     @Override
-    protected Object instantiateItem(ViewGroup viewGroup, int row, int col) {
+    public int getColumnCount(int row) {
+        // No need for second column in the 'more' row
+        if (row == list.size()) {
+            return 1;
+        } else {
+            return 2;
+        }
+    }
+
+    @Override
+    protected Object instantiateItem(ViewGroup viewGroup, final int row, int col) {
         Log.i(TAG, "instantiateItem in row:" + row);
 
         View view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_pager_image, viewGroup, false);
@@ -65,27 +77,38 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
 
         gridPagerView.setBackgroundColor(context.getResources().getColor(R.color.material_light_gray));
 
-        if (row != list.size() - 1) {
+        if (row < list.size()) {
             loadMoreLayout.setVisibility(View.GONE);
 
             if (list.get(row) != null) {
                 imageView.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.GONE);
-                imageView.setBackground(list.get(row));
+                imageView.setBackground(list.get(row).getDrawable());
+
+                if (col == 0) {
+                    overlayView.setVisibility(View.GONE);
+                    openOnPhoneLayout.setVisibility(View.GONE);
+                } else {
+                    overlayView.setVisibility(View.VISIBLE);
+                    openOnPhoneLayout.setVisibility(View.VISIBLE);
+
+                    CircledImageView openOnPhoneBtn = (CircledImageView) view.findViewById(R.id.open_on_phone_circle);
+                    openOnPhoneBtn.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            if (buttonClickedListener != null) {
+                                buttonClickedListener.onButtonClicked(BUTTON_OPEN_ON_PHONE, row);
+                            }
+                        }
+                    });
+                }
             } else {
                 imageView.setVisibility(View.GONE);
+                overlayView.setVisibility(View.GONE);
                 progressBar.setVisibility(View.VISIBLE);
+                openOnPhoneLayout.setVisibility(View.GONE);
             }
 
-            if (col == 0) {
-                imageView.setVisibility(View.VISIBLE);
-                overlayView.setVisibility(View.GONE);
-                openOnPhoneLayout.setVisibility(View.GONE);
-            } else {
-                imageView.setVisibility(View.GONE);
-                overlayView.setVisibility(View.VISIBLE);
-                openOnPhoneLayout.setVisibility(View.VISIBLE);
-            }
         } else {  // Final row
             imageView.setVisibility(View.GONE);
             overlayView.setVisibility(View.GONE);
@@ -99,8 +122,8 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
                 @Override
                 public void onClick(View v) {
                     Log.i(TAG, "Pressed!");
-                    if (moreButtonClickedListener != null) {
-                        moreButtonClickedListener.onMoreButtonClicked();
+                    if (buttonClickedListener != null) {
+                        buttonClickedListener.onButtonClicked(BUTTON_LOAD_MORE, row);
                     }
                 }
             });

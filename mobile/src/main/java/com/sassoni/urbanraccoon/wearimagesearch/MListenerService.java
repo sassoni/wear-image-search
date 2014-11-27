@@ -2,6 +2,9 @@ package com.sassoni.urbanraccoon.wearimagesearch;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.net.Uri;
+import android.net.wifi.WifiManager;
+import android.os.PowerManager;
 import android.util.Log;
 
 import com.android.volley.Request;
@@ -48,10 +51,12 @@ public class MListenerService extends WearableListenerService {
 
     private GoogleApiClient googleApiClient;
     private RequestQueue requestQueue;
+    private String keyword;
     //private int searchStartIndex = 1;
 
     @Override
     public void onCreate() {
+        Log.i(TAG, "OnCreate");
         super.onCreate();
     }
 
@@ -73,7 +78,7 @@ public class MListenerService extends WearableListenerService {
 
         String path = messageEvent.getPath();
 
-        if (path.contains(Constants.SEARCH_KEY_PATH)) {
+        if (path.contains(Constants.PATH_SEARCH)) {
 
             Log.i(TAG, "YES!");
 
@@ -93,17 +98,51 @@ public class MListenerService extends WearableListenerService {
                 //3->21
                 //y=1+(x-1)*10
                 String[] splitPath = path.split("/");
-                int searchStartIndex = 1 + ( Integer.parseInt(splitPath[2]) - 1 ) * 10;
+                int searchStartIndex = Integer.parseInt(splitPath[2])/*1 + ( Integer.parseInt(splitPath[2]) - 1 ) * 10*/;
 
-                Log.i(TAG, searchStartIndex+"");
+                Log.i(TAG, searchStartIndex + "");
 
                 requestQueue = Volley.newRequestQueue(this);
-                String keyword = new String(messageEvent.getData());
+                keyword = new String(messageEvent.getData());
                 requestImagesFor(keyword, searchStartIndex);
             }
-        } else {
+        } else if (path.contains(Constants.PATH_OPEN)) {
+//            if (googleApiClient == null || !googleApiClient.isConnected()) {
+//                googleApiClient = new GoogleApiClient.Builder(this)
+//                        .addApi(Wearable.API)
+//                        .build();
+//            }
+//            ConnectionResult connectionResult = googleApiClient.blockingConnect(30, TimeUnit.SECONDS);
+//
+//            if (!connectionResult.isSuccess()) {
+//                Log.i(TAG, "GoogleApiClient connect failed with error code " + connectionResult.getErrorCode());
+//                // anything else?
+//            } else {
+//            }
+
+            Log.i(TAG, "Opening something");
+
+            PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+            WifiManager wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
+            WifiManager.WifiLock wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "wifitag");
+            PowerManager.WakeLock wakeLock = powerManager.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                    "MyWakelockTag");
+            wakeLock.acquire();
+            wifiLock.acquire();
+            String link = new String(messageEvent.getData());
+            Log.i(TAG, "This link: " + link);
+            Intent webIntent = new Intent(Intent.ACTION_VIEW);
+            webIntent.setData(Uri.parse(link));
+            webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            this.startActivity(webIntent);
+            wakeLock.release();
+            wifiLock.release();
+        } else
+
+        {
             Log.i(TAG, "NO!");
         }
+
     }
 
     private void requestImagesFor(String keyword, final int searchStartIndex) {
@@ -117,7 +156,7 @@ public class MListenerService extends WearableListenerService {
         String url = "https://www.googleapis.com/customsearch/v1?searchType=image&key=" + Keys.API_KEY
                 + "&cx=" + Keys.CSE_CREATOR + ":" + Keys.CSE_ID
                 + "&q=" + encodedKeyword
-                + "&num=" + Constants.IMAGE_LIMIT
+                + "&num=" + Constants.MAX_IMAGES_PER_REQUEST
                 + "&start=" + searchStartIndex;
 
         Log.i(TAG, "url: " + url);
@@ -137,8 +176,9 @@ public class MListenerService extends WearableListenerService {
                                 Log.i(TAG, "Items length: " + items.length());
                                 JSONObject item = items.getJSONObject(i);
                                 JSONObject image = item.getJSONObject("image");
-                                MGoogleImage googleImage = new MGoogleImage(searchStartIndex+i-1, image.getString("thumbnailLink"), image.getString("contextLink"));
-//                                MGoogleImage googleImage = new MGoogleImage(i, item.getString("link"), image.getString("contextLink"));
+                                MGoogleImage googleImage = new MGoogleImage(searchStartIndex + i - 1, image.getString("thumbnailLink"), image.getString("contextLink"));
+                                Log.i(TAG, "######## link: " + image.getString("contextLink"));
+//   MGoogleImage googleImage = new MGoogleImage(i, item.getString("link"), image.getString("contextLink"));
                                 thumbnailList.add(googleImage);
                             }
                         } catch (JSONException e) {
@@ -188,6 +228,7 @@ public class MListenerService extends WearableListenerService {
 
         dataMap.getDataMap().putAsset(Constants.DMAP_KEY_IMAGE, toAsset(image.getThumbnail()));
         dataMap.getDataMap().putInt(Constants.DMAP_KEY_INDEX, image.getIndex());
+        dataMap.getDataMap().putString(Constants.DMAP_KEY_SEARCH_TERM, keyword);
         dataMap.getDataMap().putString(Constants.DMAP_KEY_CONTEXT_URL, image.getContextLink());
         dataMap.getDataMap().putLong(Constants.DMAP_KEY_TIME, new Date().getTime());
 

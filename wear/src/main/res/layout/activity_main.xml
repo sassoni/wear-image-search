@@ -8,13 +8,14 @@
     tools:context=".MyActivity">
 
     <LinearLayout
+        android:id="@+id/tap_to_search_layout"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
         android:orientation="vertical">
 
         <android.support.wearable.view.CircledImageView
-            android:id="@+id/main_tap_to_search_btn"
+            android:id="@+id/tap_to_search_circle"
             style="@style/circle_button_layout"
             android:src="@drawable/icon_search_2"
             app:circle_color="@color/material_red"
@@ -22,7 +23,7 @@
             app:circle_radius_pressed="@dimen/circle_radius_pressed" />
 
         <TextView
-            android:id="@+id/main_tap_to_search_label"
+            android:id="@+id/tap_to_search_label"
             style="@style/circle_button_label"
             android:text="@string/tap_to_search" />
     </LinearLayout>
@@ -32,6 +33,12 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:keepScreenOn="true"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/error_message"
+        style="@style/error_message_text"
+        android:text="@string/error"
         android:visibility="gone" />
 
 </RelativeLayout>

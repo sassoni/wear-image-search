@@ -2,6 +2,7 @@ package com.sassoni.urbanraccoon.wearimagesearch.common;
 
 
 import android.graphics.Bitmap;
+import android.graphics.drawable.Drawable;
 
 import com.google.android.gms.wearable.Asset;
 
@@ -17,6 +18,7 @@ public class MGoogleImage {
     int width;
     private Bitmap thumbnail;
     private Asset asset;
+    private Drawable drawable;
 
     public MGoogleImage(int index, String thumbnailLink, String contextLink) {
         this.index = index;
@@ -33,7 +35,7 @@ public class MGoogleImage {
     }
 
     public String getContextLink() {
-        return thumbnailLink;
+        return contextLink;
     }
 
     public Bitmap getThumbnail() {
@@ -50,5 +52,13 @@ public class MGoogleImage {
 
     public Asset getAsset() {
         return asset;
+    }
+
+    public Drawable getDrawable() {
+        return drawable;
+    }
+
+    public void setDrawable(Drawable drawable) {
+        this.drawable = drawable;
     }
 }

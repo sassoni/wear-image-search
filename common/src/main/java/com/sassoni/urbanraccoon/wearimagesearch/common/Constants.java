@@ -5,13 +5,17 @@ public class Constants {
     private Constants() {
     }
 
-    public static final int IMAGE_LIMIT = 10;
+    public static final int MAX_IMAGES_PER_REQUEST = 10;
+    public static final int MAX_IMAGES_TOTAL = 30;
 
     public static final String PATH_IMAGE = "/image";
-    public static final String SEARCH_KEY_PATH = "/search";
+    public static final String PATH_SEARCH = "/search";
+    public static final String PATH_OPEN = "/open";
 
     public static String DMAP_KEY_IMAGE = "image";
     public static String DMAP_KEY_INDEX = "index";
-    public static String DMAP_KEY_CONTEXT_URL = "context";
+    public static String DMAP_KEY_SEARCH_TERM = "searchTerm";
+    public static String DMAP_KEY_CONTEXT_URL = "contextUrl";
     public static String DMAP_KEY_TIME = "time";
+
 }

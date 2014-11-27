@@ -36,7 +36,7 @@
             app:circle_radius_pressed="@dimen/circle_radius_pressed" />
 
         <TextView
-            android:id="@+id/open_on_phone_text"
+            android:id="@+id/open_on_phone_label"
             style="@style/circle_button_label"
             android:text="@string/open_on_phone" />
     </LinearLayout>
@@ -63,7 +63,7 @@
             app:circle_radius_pressed="@dimen/circle_radius_pressed" />
 
         <TextView
-            android:id="@+id/load_more_text"
+            android:id="@+id/load_more_label"
             style="@style/circle_button_label"
             android:text="@string/load_more" />
     </LinearLayout>
