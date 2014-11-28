@@ -9,6 +9,7 @@ import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Parcel;
 import android.speech.RecognizerIntent;
 import android.support.wearable.view.CircledImageView;
 import android.support.wearable.view.GridViewPager;
@@ -26,17 +27,23 @@ import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.MessageApi;
+import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.NodeApi;
 import com.google.android.gms.wearable.Wearable;
 import com.sassoni.urbanraccoon.wearimagesearch.common.Constants;
-import com.sassoni.urbanraccoon.wearimagesearch.common.MGoogleImage;
+import com.sassoni.urbanraccoon.wearimagesearch.common.ParcelableUtil;
+import com.sassoni.urbanraccoon.wearimagesearch.common.WearImage;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.zip.GZIPInputStream;
 
 // TODO Test while disconnected
 // TODO onDestroy delete data in storage?
@@ -49,7 +56,8 @@ import java.util.List;
 public class WMainActivity extends Activity implements DataApi.DataListener,
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        WImagesGridPagerAdapter.ButtonClickedListener {
+        WImagesGridPagerAdapter.ButtonClickedListener,
+        MessageApi.MessageListener {
 
     private static final String TAG = "***** WEAR: " + WMainActivity.class.getSimpleName();
 
@@ -61,7 +69,7 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
     private GoogleApiClient mGoogleApiClient;
     private WImagesGridPagerAdapter adapter;
     private int imagesIndices[];
-    private List<MGoogleImage> imagesList;
+    private List<WearImage> imagesList;
     private String searchTerm;
 
     private LinearLayout tapToSearchLayout;
@@ -95,7 +103,7 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
 
         imagesIndices = new int[Constants.MAX_IMAGES_TOTAL];
 
-        imagesList = new ArrayList<MGoogleImage>();
+        imagesList = new ArrayList<WearImage>();
         growListBy(Constants.MAX_IMAGES_PER_REQUEST);
 
 //        adapter = new WImagesGridPagerAdapter(this, imagesList);
@@ -113,6 +121,7 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
     protected void onStop() {
         if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
             Wearable.DataApi.removeListener(mGoogleApiClient, this);
+            Wearable.MessageApi.removeListener(mGoogleApiClient, this);
             mGoogleApiClient.disconnect();
         }
         super.onStop();
@@ -128,6 +137,7 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
     @Override
     public void onConnected(Bundle bundle) {
         Wearable.DataApi.addListener(mGoogleApiClient, this);
+        Wearable.MessageApi.addListener(mGoogleApiClient, this);
     }
 
     @Override
@@ -152,18 +162,37 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK) {
-            switchToGridView();
+        switchToGridView();
+        searchTerm = "george papandreou";
+        Log.i(TAG, searchTerm);
 
-            List<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-            searchTerm = results.get(0);
-            Log.i(TAG, searchTerm);
-
-            new SendRequestForSearchTermTask().execute();
-        } else {
-            showErrorMessage();
-        }
+        new SendRequestForSearchTermTask().execute();
         super.onActivityResult(requestCode, resultCode, data);
+//        if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK) {
+//            switchToGridView();
+//
+//            List<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+//            searchTerm = results.get(0);
+//            Log.i(TAG, searchTerm);
+//
+//            new SendRequestForSearchTermTask().execute();
+//        } else {
+//            showErrorMessage();
+//        }
+//        super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    @Override
+    public void onMessageReceived(MessageEvent messageEvent) {
+        Log.i(TAG, "Received message from phone!");
+
+        if (messageEvent.getPath().contains(Constants.PATH_IMAGE)) {
+            Log.i(TAG, "YEs!");
+            WearImage wearImage = ParcelableUtil.unmarshall(messageEvent.getData(), WearImage.CREATOR);
+            new DecodeAndShowImageTask().execute(wearImage);
+        } else {
+            Log.i(TAG, "No!");
+        }
     }
 
     // ----- Sending data ----- //
@@ -222,27 +251,30 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
     @Override
     public void onDataChanged(DataEventBuffer dataEvents) {
         Log.i(TAG, "Data Changed!");
-        for (DataEvent event : dataEvents) {
-            if (event.getType() == DataEvent.TYPE_CHANGED &&
-                    event.getDataItem().getUri().getPath().equals(Constants.PATH_IMAGE)) {
-                DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
-
-                String searchTermForData = dataMapItem.getDataMap().getString(Constants.DMAP_KEY_SEARCH_TERM);
-
-                if (searchTermForData.equals(searchTerm)) {  // Ignore any old requests
-                    Asset profileAsset = dataMapItem.getDataMap().getAsset(Constants.DMAP_KEY_IMAGE);
-                    int imageIndex = dataMapItem.getDataMap().getInt(Constants.DMAP_KEY_INDEX);
-                    String contextUrl = dataMapItem.getDataMap().getString(Constants.DMAP_KEY_CONTEXT_URL);
-
-                    Log.i(TAG, "We got new image for index: " + imageIndex);
-                    Log.i(TAG, "wih context urlx: " + contextUrl);
-                    MGoogleImage mGoogleImage = new MGoogleImage(imageIndex, null, contextUrl);
-                    mGoogleImage.setAsset(profileAsset);
-//                MyImage image = new MyImage(imageIndex, "url", profileAsset);
-                    new DecodeAndShowImageTask().execute(mGoogleImage);
-                }
-            }
-        }
+//        for (DataEvent event : dataEvents) {
+//            if (event.getType() == DataEvent.TYPE_CHANGED &&
+//                    event.getDataItem().getUri().getPath().equals(Constants.PATH_IMAGE)) {
+//                DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
+//
+//                String searchTermForData = dataMapItem.getDataMap().getString(Constants.DMAP_KEY_SEARCH_TERM);
+//
+//                if (searchTermForData.equals(searchTerm)) {  // Ignore any old requests
+//                    Asset profileAsset = dataMapItem.getDataMap().getAsset(Constants.DMAP_KEY_IMAGE);
+//                    int imageIndex = dataMapItem.getDataMap().getInt(Constants.DMAP_KEY_INDEX);
+//                    String contextUrl = dataMapItem.getDataMap().getString(Constants.DMAP_KEY_CONTEXT_URL);
+//
+//                    byte[] compressedImage = dataMapItem.getDataMap().getByteArray("compressed");
+//
+//                    Log.i(TAG, "We got new image for index: " + imageIndex);
+//                    Log.i(TAG, "wih context urlx: " + contextUrl);
+//                    WearImage wearImage = new WearImage(imageIndex, null, null, contextUrl);
+//                    wearImage.setAsset(profileAsset);
+//                    wearImage.setImageData(compressedImage);
+////                MyImage image = new MyImage(imageIndex, "url", profileAsset);
+//                    new DecodeAndShowImageTask().execute(wearImage);
+//                }
+//            }
+//        }
     }
 
     // ----- Buttons in gridpager actions ----- //
@@ -283,7 +315,7 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
 
     private void openOnPhone(int rowClicked) {
         int imageIndex = imagesIndices[rowClicked];
-        MGoogleImage image = imagesList.get(imageIndex);
+        WearImage image = imagesList.get(imageIndex);
         String link = image.getContextLink();
 
         new SendOpenOnPhoneMessageTask().execute(link);
@@ -345,39 +377,77 @@ public class WMainActivity extends Activity implements DataApi.DataListener,
         gridViewPager.setVisibility(View.VISIBLE);
     }
 
-    private class DecodeAndShowImageTask extends AsyncTask<MGoogleImage, Void, Bitmap> {
-        MGoogleImage image;
+    private class DecodeAndShowImageTask extends AsyncTask<WearImage, Void, Bitmap> {
+        WearImage image;
 
-        protected Bitmap doInBackground(MGoogleImage... images) {
+        protected Bitmap doInBackground(WearImage... images) {
             image = images[0];
 
-            Asset asset = image.getAsset();
-            if (asset == null) {
-                return null;
+            byte[] compressedImageBytes = image.getImageData();
+            byte[] decompressedImageBytes = null;
+
+            try {
+                decompressedImageBytes = decompress(image.getImageData());
+                Log.i(TAG, "Size decompressed " + decompressedImageBytes.length);
+            } catch (IOException e) {
+                Log.i(TAG, "Decompressed null");
+                decompressedImageBytes = compressedImageBytes;
+                e.printStackTrace();
             }
 
-            InputStream assetInputStream = Wearable.DataApi.getFdForAsset(mGoogleApiClient, asset).await().getInputStream();
-            if (assetInputStream == null) {
-                return null;
-            }
+            Bitmap bitmap = BitmapFactory.decodeByteArray(decompressedImageBytes, 0, decompressedImageBytes.length);
 
-            return BitmapFactory.decodeStream(assetInputStream);
+            Log.i(TAG, "Size bitmap " + bitmap.getByteCount());
+
+            return bitmap;
+
+            //            Log.i(TAG, "Size compressed " + image.getImageData().length);
+
+
+//            Asset asset = image.getAsset();
+//            if (asset == null) {
+//                return null;
+//            }
+//
+//            InputStream assetInputStream = Wearable.DataApi.getFdForAsset(mGoogleApiClient, asset).await().getInputStream();
+//            if (assetInputStream == null) {
+//                return null;
+//            }
+//
+//            return BitmapFactory.decodeStream(assetInputStream);
+
         }
 
         protected void onPostExecute(Bitmap bitmap) {
-            Log.i(TAG, "Position in grid: " + positionInGrid);
 
-            if (bitmap != null) {
-                Drawable drawable = new BitmapDrawable(getResources(), bitmap);
-                // We use positionInGrid instead of image index so that
-                // the images are shown based on the order they came
-                image.setDrawable(drawable);
-                imagesList.set(positionInGrid, image);
-                adapter.notifyDataSetChanged();
-                imagesIndices[positionInGrid] = image.getIndex();
-                positionInGrid++;
-            }
+
+//            Drawable drawable2 = new BitmapDrawable(getResources(), bitmap2);
+
+            Drawable drawable = new BitmapDrawable(getResources(), bitmap);
+            // We use positionInGrid instead of image index so that
+            // the images are shown based on the order they came
+            image.setDrawable(drawable);
+            imagesList.set(image.getPosition(), image);
+            adapter.notifyDataSetChanged();
+
+            imagesIndices[positionInGrid] = image.getIndex();
+            positionInGrid++;
         }
+    }
+
+    public static byte[] decompress(byte[] compressed) throws IOException {
+        final int BUFFER_SIZE = 32;
+        ByteArrayInputStream is = new ByteArrayInputStream(compressed);
+        GZIPInputStream gis = new GZIPInputStream(is, BUFFER_SIZE);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] data = new byte[BUFFER_SIZE];
+        int bytesRead;
+        while ((bytesRead = gis.read(data)) != -1) {
+            out.write(data, 0, bytesRead);
+        }
+        gis.close();
+        is.close();
+        return out.toByteArray();
     }
 
 }

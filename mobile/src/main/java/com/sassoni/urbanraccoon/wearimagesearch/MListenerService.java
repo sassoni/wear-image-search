@@ -17,16 +17,17 @@ import com.android.volley.toolbox.Volley;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.wearable.Asset;
-import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.MessageApi;
 import com.google.android.gms.wearable.MessageEvent;
-import com.google.android.gms.wearable.PutDataMapRequest;
-import com.google.android.gms.wearable.PutDataRequest;
+import com.google.android.gms.wearable.Node;
+import com.google.android.gms.wearable.NodeApi;
 import com.google.android.gms.wearable.Wearable;
 import com.google.android.gms.wearable.WearableListenerService;
 import com.sassoni.urbanraccoon.wearimagesearch.common.Constants;
+import com.sassoni.urbanraccoon.wearimagesearch.common.GZipUtils;
 import com.sassoni.urbanraccoon.wearimagesearch.common.Keys;
-import com.sassoni.urbanraccoon.wearimagesearch.common.MGoogleImage;
+import com.sassoni.urbanraccoon.wearimagesearch.common.ParcelableUtil;
+import com.sassoni.urbanraccoon.wearimagesearch.common.WearImage;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -37,7 +38,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -51,8 +52,8 @@ public class MListenerService extends WearableListenerService {
 
     private GoogleApiClient googleApiClient;
     private RequestQueue requestQueue;
-    private String keyword;
-    //private int searchStartIndex = 1;
+    private static int position = 0;
+    private HashSet<String> nodes;
 
     @Override
     public void onCreate() {
@@ -73,54 +74,54 @@ public class MListenerService extends WearableListenerService {
     @Override
     public void onMessageReceived(MessageEvent messageEvent) {
         super.onMessageReceived(messageEvent);
-
         Log.i(TAG, "Message received: " + new String(messageEvent.getData()));
 
         String path = messageEvent.getPath();
 
         if (path.contains(Constants.PATH_SEARCH)) {
+            Log.i(TAG, "Message is for search!");
 
-            Log.i(TAG, "YES!");
-
-            if (googleApiClient == null || !googleApiClient.isConnected()) {
+            if (googleApiClient == null) {
                 googleApiClient = new GoogleApiClient.Builder(this)
                         .addApi(Wearable.API)
                         .build();
             }
-            ConnectionResult connectionResult = googleApiClient.blockingConnect(30, TimeUnit.SECONDS);
 
-            if (!connectionResult.isSuccess()) {
-                Log.i(TAG, "GoogleApiClient connect failed with error code " + connectionResult.getErrorCode());
-                // anything else?
-            } else {
-                //(x)1->(y)1
-                //2->11
-                //3->21
-                //y=1+(x-1)*10
+            if (!googleApiClient.isConnected()){
+                ConnectionResult connectionResult = googleApiClient.blockingConnect(10, TimeUnit.SECONDS);
+
+                if (!connectionResult.isSuccess()) {
+                    Log.i(TAG, "GoogleApiClient connect failed with error code " + connectionResult.getErrorCode());
+                    // Send message to watch
+                    return;
+                }
+            }
+
+
+                nodes = new HashSet<String>();
+                NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi.getConnectedNodes(googleApiClient).await();
+                if (nodes != null) {
+                    for (Node node : nodes.getNodes()) {
+                        this.nodes.add(node.getId());
+                    }
+                }
+
                 String[] splitPath = path.split("/");
-                int searchStartIndex = Integer.parseInt(splitPath[2])/*1 + ( Integer.parseInt(splitPath[2]) - 1 ) * 10*/;
-
+                int searchStartIndex = Integer.parseInt(splitPath[2]);
                 Log.i(TAG, searchStartIndex + "");
 
-                requestQueue = Volley.newRequestQueue(this);
-                keyword = new String(messageEvent.getData());
-                requestImagesFor(keyword, searchStartIndex);
-            }
-        } else if (path.contains(Constants.PATH_OPEN)) {
-//            if (googleApiClient == null || !googleApiClient.isConnected()) {
-//                googleApiClient = new GoogleApiClient.Builder(this)
-//                        .addApi(Wearable.API)
-//                        .build();
-//            }
-//            ConnectionResult connectionResult = googleApiClient.blockingConnect(30, TimeUnit.SECONDS);
-//
-//            if (!connectionResult.isSuccess()) {
-//                Log.i(TAG, "GoogleApiClient connect failed with error code " + connectionResult.getErrorCode());
-//                // anything else?
-//            } else {
-//            }
+                // If it's the first time we are asking for this keyword
+                // initialize position on grid
+                if (searchStartIndex == 1) {
+                    position = 0;
+                }
 
-            Log.i(TAG, "Opening something");
+                requestQueue = Volley.newRequestQueue(this);
+                String keyword = new String(messageEvent.getData());
+                requestImagesFor(keyword, searchStartIndex);
+
+        } else if (path.contains(Constants.PATH_OPEN)) {
+            Log.i(TAG, "Message is to open link.");
 
             PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
             WifiManager wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
@@ -137,15 +138,11 @@ public class MListenerService extends WearableListenerService {
             this.startActivity(webIntent);
             wakeLock.release();
             wifiLock.release();
-        } else
-
-        {
-            Log.i(TAG, "NO!");
         }
-
     }
 
     private void requestImagesFor(String keyword, final int searchStartIndex) {
+
         String encodedKeyword = "";
         try {
             encodedKeyword = URLEncoder.encode(keyword, "UTF-8");
@@ -167,24 +164,23 @@ public class MListenerService extends WearableListenerService {
                     public void onResponse(JSONObject jsonObject) {
                         Log.i(TAG, "Got json response back");
 
-                        List<MGoogleImage> thumbnailList = new ArrayList<MGoogleImage>();
+                        List<WearImage> wearImageList = new ArrayList<WearImage>();
 
                         try {
                             JSONArray items = jsonObject.getJSONArray("items");
+                            Log.i(TAG, "Items length: " + items.length());
 
                             for (int i = 0; i < items.length(); i++) {
-                                Log.i(TAG, "Items length: " + items.length());
                                 JSONObject item = items.getJSONObject(i);
                                 JSONObject image = item.getJSONObject("image");
-                                MGoogleImage googleImage = new MGoogleImage(searchStartIndex + i - 1, image.getString("thumbnailLink"), image.getString("contextLink"));
-                                Log.i(TAG, "######## link: " + image.getString("contextLink"));
-//   MGoogleImage googleImage = new MGoogleImage(i, item.getString("link"), image.getString("contextLink"));
-                                thumbnailList.add(googleImage);
+
+                                WearImage wearImage = new WearImage(searchStartIndex + i - 1, item.getString("link"), image.getString("contextLink"));
+                                wearImageList.add(wearImage);
                             }
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
-                        downloadImages(thumbnailList);
+                        downloadImages(wearImageList);
                     }
                 },
                 new Response.ErrorListener() {
@@ -197,19 +193,61 @@ public class MListenerService extends WearableListenerService {
         requestQueue.add(jsonObjectRequest);
     }
 
-    private void downloadImages(List<MGoogleImage> imageList) {
+    private void downloadImages(List<WearImage> imageList) {
         Log.i(TAG, "Starting image download");
 
-        for (final MGoogleImage image : imageList) {
-            String imageUrl = image.getThumbnailLink();
+//        final Collection<String> nodes = getNodes();
+        // TODO the rest should happen if nodes are not empty
+
+        if (nodes.isEmpty()) {
+            Log.i(TAG, "Nodes are empty");
+        } else {
+            Log.i(TAG, "Nodes are not empty");
+        }
+
+        Log.i(TAG, "imagelist size: " + imageList.size());
+
+        for (final WearImage image : imageList) {
+
+            String imageUrl = image.getLink();  // image.getLink()
             Log.i(TAG, "URL: " + imageUrl);
+
             ImageRequest request = new ImageRequest(imageUrl,
                     new Response.Listener<Bitmap>() {
                         @Override
                         public void onResponse(Bitmap bitmap) {
-                            Log.i("BYTES", bitmap.getByteCount() + "");
-                            image.setThumbnail(bitmap);
-                            sendImageToWatch(image);
+
+                            // Scale the bitmap
+                            // TODO Check scaling factors
+                            Bitmap scaledBitmap = Bitmap.createScaledBitmap(bitmap, 250, 250, false);
+
+                            // Create byte array
+                            ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream);
+                            byte[] byteArray = stream.toByteArray();
+
+                            // Compress the byteArray
+                            byte[] compressedByteArray = null;
+                            try {
+                                compressedByteArray = GZipUtils.compress(byteArray);
+
+                            } catch (IOException e) {
+                                compressedByteArray = byteArray;
+                                e.printStackTrace();
+                            }
+
+                            Log.i("BYTES bitmap", bitmap.getByteCount() + "");
+                            Log.i("BYTES scaledBitmap", scaledBitmap.getByteCount() + "");
+                            Log.i("BYTES byteArray", byteArray.length + "");
+                            Log.i("BYTES compressedByteArray", compressedByteArray.length + "");
+
+                            image.setImageData(compressedByteArray);
+                            Log.i(TAG, "position: " + position);
+                            image.setPosition(position);
+                            position++;
+                            for (String node : nodes) {
+                                sendImageToWatch(node, image);
+                            }
                         }
                     }, 0, 0, null,
                     new Response.ErrorListener() {
@@ -221,41 +259,72 @@ public class MListenerService extends WearableListenerService {
         }
     }
 
-    private void sendImageToWatch(MGoogleImage image) {
+//    private class SendImageToWatchTask extends AsyncTask<Void, Void, Void> {
+//        @Override
+//        protected Void doInBackground(Void... args) {
+//            Log.i(TAG, "Start sending message...");
+//            Collection<String> nodes = getNodes();
+//            if (nodes.isEmpty()) {
+////                showErrorMessage();
+//            } else {
+//                for (String node : nodes) {
+//                    Log.i(TAG, "... to node: " + node);
+//                    sendImageToWatch(node);
+//                }
+//            }
+//            return null;
+//        }
+//    }
+
+    private void sendImageToWatch(String node, WearImage image) {
         Log.i(TAG, "Sending image");
 
-        PutDataMapRequest dataMap = PutDataMapRequest.create(Constants.PATH_IMAGE);
+        byte[] wearImageBytes = ParcelableUtil.marshall(image);
+        Log.i(TAG, "After marshalling: " + wearImageBytes.length);
 
-        dataMap.getDataMap().putAsset(Constants.DMAP_KEY_IMAGE, toAsset(image.getThumbnail()));
-        dataMap.getDataMap().putInt(Constants.DMAP_KEY_INDEX, image.getIndex());
-        dataMap.getDataMap().putString(Constants.DMAP_KEY_SEARCH_TERM, keyword);
-        dataMap.getDataMap().putString(Constants.DMAP_KEY_CONTEXT_URL, image.getContextLink());
-        dataMap.getDataMap().putLong(Constants.DMAP_KEY_TIME, new Date().getTime());
-
-        PutDataRequest request = dataMap.asPutDataRequest();
-        Wearable.DataApi.putDataItem(googleApiClient, request)
-                .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
-                    @Override
-                    public void onResult(DataApi.DataItemResult dataItemResult) {
-                        Log.i(TAG, "Sending image success: " + dataItemResult.getStatus().isSuccess());
-                    }
-                });
+        Wearable.MessageApi.sendMessage(googleApiClient, node, Constants.PATH_IMAGE, wearImageBytes)
+                .setResultCallback(new ResultCallback<MessageApi.SendMessageResult>() {
+                                       @Override
+                                       public void onResult(MessageApi.SendMessageResult sendMessageResult) {
+                                           if (!sendMessageResult.getStatus().isSuccess()) {
+                                               Log.i(TAG, "Failed to send message with status code: "
+                                                       + sendMessageResult.getStatus().getStatusCode());
+                                           } else {
+                                               Log.i(TAG, "Sent message successfully ");
+                                           }
+                                       }
+                                   }
+                );
+//
+//        PutDataMapRequest dataMap = PutDataMapRequest.create(Constants.PATH_IMAGE);
+//
+//        dataMap.getDataMap().putByteArray(Constants.DMAP_KEY_IMAGE, image.getImageData());
+//        dataMap.getDataMap().putInt(Constants.DMAP_KEY_INDEX, image.getIndex());
+//        dataMap.getDataMap().putString(Constants.DMAP_KEY_SEARCH_TERM, keyword);
+//        dataMap.getDataMap().putString(Constants.DMAP_KEY_CONTEXT_URL, image.getContextLink());
+//        dataMap.getDataMap().putLong(Constants.DMAP_KEY_TIME, new Date().getTime());
+//
+//        PutDataRequest request = dataMap.asPutDataRequest();
+//        Wearable.DataApi.putDataItem(googleApiClient, request)
+//                .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+//                    @Override
+//                    public void onResult(DataApi.DataItemResult dataItemResult) {
+//                        Log.i(TAG, "Sending image success: " + dataItemResult.getStatus().isSuccess());
+//                    }
+//                });
     }
 
-    private static Asset toAsset(Bitmap bitmap) {
-        ByteArrayOutputStream byteStream = null;
-        try {
-            byteStream = new ByteArrayOutputStream();
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteStream);
-            return Asset.createFromBytes(byteStream.toByteArray());
-        } finally {
-            if (null != byteStream) {
-                try {
-                    byteStream.close();
-                } catch (IOException e) {
-                    // what?
-                }
-            }
-        }
-    }
+//    private Collection<String> getNodes() {
+//        HashSet<String> nodes = new HashSet<String>();
+//        NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi.getConnectedNodes(googleApiClient).await();
+//
+//        if (nodes != null) {
+//            for (Node node : nodes.getNodes()) {
+//                nodes.add(node.getId());
+//            }
+//        }
+//
+//        return nodes;
+//    }
+
 }

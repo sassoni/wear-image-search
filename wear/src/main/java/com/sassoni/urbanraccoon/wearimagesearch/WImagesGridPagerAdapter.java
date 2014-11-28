@@ -2,7 +2,6 @@ package com.sassoni.urbanraccoon.wearimagesearch;
 
 import android.app.Activity;
 import android.content.Context;
-import android.graphics.drawable.Drawable;
 import android.support.wearable.view.CircledImageView;
 import android.support.wearable.view.GridPagerAdapter;
 import android.util.Log;
@@ -15,7 +14,7 @@ import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 
 import com.sassoni.urbanraccoon.wearimagesearch.common.Constants;
-import com.sassoni.urbanraccoon.wearimagesearch.common.MGoogleImage;
+import com.sassoni.urbanraccoon.wearimagesearch.common.WearImage;
 
 import java.util.List;
 
@@ -27,7 +26,7 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
     public static final int BUTTON_OPEN_ON_PHONE = 12;
 
     private Context context;
-    private List<MGoogleImage> list;
+    private List<WearImage> list;
 
     public interface ButtonClickedListener {
         public void onButtonClicked(int buttonId, int row);
@@ -36,7 +35,7 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
     ButtonClickedListener buttonClickedListener;
 
 //    public WImagesGridPagerAdapter(Activity activity, List<Drawable> list) {
-    public WImagesGridPagerAdapter(Activity activity, List<MGoogleImage> list) {
+    public WImagesGridPagerAdapter(Activity activity, List<WearImage> list) {
         this.context = activity;
         this.list = list;
         buttonClickedListener = (ButtonClickedListener) activity;
@@ -84,6 +83,8 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
                 imageView.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.GONE);
                 imageView.setBackground(list.get(row).getDrawable());
+//                imageView.setImageDrawable(list.get(row).getDrawable());
+//                imageView.setScaleType(ImageView.ScaleType.CENTER);
 
                 if (col == 0) {
                     overlayView.setVisibility(View.GONE);

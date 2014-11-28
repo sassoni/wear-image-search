@@ -11,6 +11,7 @@ public class Constants {
     public static final String PATH_IMAGE = "/image";
     public static final String PATH_SEARCH = "/search";
     public static final String PATH_OPEN = "/open";
+    public static final String PATH_ERROR = "/error";
 
     public static String DMAP_KEY_IMAGE = "image";
     public static String DMAP_KEY_INDEX = "index";
