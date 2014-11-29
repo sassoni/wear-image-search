@@ -2,9 +2,6 @@ package com.sassoni.urbanraccoon.wearimagesearch;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.net.Uri;
-import android.net.wifi.WifiManager;
-import android.os.PowerManager;
 import android.util.Log;
 
 import com.android.volley.Request;
@@ -102,30 +99,29 @@ public class MListenerService extends WearableListenerService {
             String keyword = new String(messageEvent.getData());
             requestImagesFor(keyword, searchStartIndex);
 
-        } else if (path.contains(Constants.PATH_OPEN)) {
-            Log.i(TAG, "Message is to open link.");
-            String link = new String(messageEvent.getData());
-            openLinkOnPhone(link);
         }
+        // === Open on phone feature === //
+//        else if (path.contains(Constants.PATH_OPEN)) {
+//            Log.i(TAG, "Message is to open link.");
+//            String link = new String(messageEvent.getData());
+//            openLinkOnPhone(link);
+//        }
     }
 
-    private void openLinkOnPhone(String link) {
-        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-        WifiManager wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
-        WifiManager.WifiLock wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "wifitag");
-        PowerManager.WakeLock wakeLock = powerManager.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                "MyWakelockTag");
-        wakeLock.acquire();
-        wifiLock.acquire();
-
-        Log.i(TAG, "This link: " + link);
-        Intent webIntent = new Intent(Intent.ACTION_VIEW);
-        webIntent.setData(Uri.parse(link));
-        webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        this.startActivity(webIntent);
-        wakeLock.release();
-        wifiLock.release();
-    }
+    // === Open on phone ===
+//    private void openLinkOnPhone(String link) {
+//        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+//        PowerManager.WakeLock wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WISWakelock");
+//        wakeLock.acquire();
+//        Intent webIntent = new Intent(Intent.ACTION_VIEW);
+//        if (!link.startsWith("http://") || !link.startsWith("https://")) {
+//            link = "http://" + link;
+//        }
+//        webIntent.setData(Uri.parse(link));
+//        webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+//        this.startActivity(webIntent);
+//        wakeLock.release();
+//    }
 
     private void requestImagesFor(String keyword, final int searchStartIndex) {
         String encodedKeyword = "";
@@ -226,7 +222,6 @@ public class MListenerService extends WearableListenerService {
                     }
                 });
         requestQueue.add(request);
-
     }
 
     private void sendImageToWatch(WearImage image) {
