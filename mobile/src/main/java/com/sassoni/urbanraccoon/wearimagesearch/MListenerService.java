@@ -21,7 +21,6 @@ import com.google.android.gms.wearable.WearableListenerService;
 import com.sassoni.urbanraccoon.wearimagesearch.common.Constants;
 import com.sassoni.urbanraccoon.wearimagesearch.common.GZipUtils;
 import com.sassoni.urbanraccoon.wearimagesearch.common.Keys;
-import com.sassoni.urbanraccoon.wearimagesearch.common.ParcelableUtil;
 import com.sassoni.urbanraccoon.wearimagesearch.common.WearImage;
 
 import org.json.JSONArray;
@@ -227,7 +226,7 @@ public class MListenerService extends WearableListenerService {
     private void sendImageToWatch(WearImage image) {
         Log.i(TAG, "Sending image");
 
-        byte[] wearImageBytes = ParcelableUtil.marshall(image);
+        byte[] wearImageBytes = image.toByteArray();
         Log.i(TAG, "After marshalling: " + wearImageBytes.length);
 
         Wearable.MessageApi.sendMessage(googleApiClient, watchNode, Constants.PATH_IMAGE, wearImageBytes)

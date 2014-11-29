@@ -27,7 +27,6 @@ import com.google.android.gms.wearable.NodeApi;
 import com.google.android.gms.wearable.Wearable;
 import com.sassoni.urbanraccoon.wearimagesearch.common.Constants;
 import com.sassoni.urbanraccoon.wearimagesearch.common.GZipUtils;
-import com.sassoni.urbanraccoon.wearimagesearch.common.ParcelableUtil;
 import com.sassoni.urbanraccoon.wearimagesearch.common.WearImage;
 
 import java.io.IOException;
@@ -215,7 +214,7 @@ public class WMainActivity extends Activity implements
         Log.i(TAG, "Received message from phone!");
 
         if (messageEvent.getPath().contains(Constants.PATH_IMAGE)) {
-            WearImage wearImage = ParcelableUtil.unmarshall(messageEvent.getData(), WearImage.CREATOR);
+            WearImage wearImage = new WearImage(messageEvent.getData());
             new DecodeAndShowImageTask().execute(wearImage);
         } else if (messageEvent.getPath().contains(Constants.PATH_ERROR)) {
             showErrorMessage();

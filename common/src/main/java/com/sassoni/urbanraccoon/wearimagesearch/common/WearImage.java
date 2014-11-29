@@ -6,7 +6,7 @@ import android.os.Parcelable;
 
 public class WearImage implements Parcelable {
 
-    private int index;  // The index that the image appears in search search results
+    private int index;  // The index that the image appears in search results
     private int position;  // The position in the grid that the image will appear
     private String link;
     private String contextLink;
@@ -17,6 +17,57 @@ public class WearImage implements Parcelable {
         this.index = index;
         this.link = link;
         this.contextLink = contextLink;
+    }
+
+    public WearImage(byte[] bytes) {
+        Parcel parcel = Parcel.obtain();
+        parcel.unmarshall(bytes, 0, bytes.length);
+        parcel.setDataPosition(0);
+        index = parcel.readInt();
+        position = parcel.readInt();
+        link = parcel.readString();
+        contextLink = parcel.readString();
+        imageData = parcel.createByteArray();
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel out, int flags) {
+        out.writeInt(index);
+        out.writeInt(position);
+        out.writeString(link);
+        out.writeString(contextLink);
+        out.writeByteArray(imageData);
+    }
+
+    public static final Parcelable.Creator<WearImage> CREATOR = new Parcelable.Creator<WearImage>() {
+        public WearImage createFromParcel(Parcel in) {
+            return new WearImage(in);
+        }
+
+        public WearImage[] newArray(int size) {
+            return new WearImage[size];
+        }
+    };
+
+    private WearImage(Parcel in) {
+        index = in.readInt();
+        position = in.readInt();
+        link = in.readString();
+        contextLink = in.readString();
+        imageData = in.createByteArray();
+    }
+
+    public byte[] toByteArray() {
+        Parcel parcel = Parcel.obtain();
+        this.writeToParcel(parcel, 0);
+        byte[] bytes = parcel.marshall();
+        parcel.recycle();
+        return bytes;
     }
 
     public int getIndex() {
@@ -55,36 +106,4 @@ public class WearImage implements Parcelable {
         return drawable;
     }
 
-    @Override
-    public int describeContents() {
-        return 0;
-    }
-
-    @Override
-    public void writeToParcel(Parcel out, int flags) {
-        out.writeInt(index);
-        out.writeInt(position);
-        out.writeString(link);
-        out.writeString(contextLink);
-        out.writeByteArray(imageData);
-    }
-
-    public static final Parcelable.Creator<WearImage> CREATOR
-            = new Parcelable.Creator<WearImage>() {
-        public WearImage createFromParcel(Parcel in) {
-            return new WearImage(in);
-        }
-
-        public WearImage[] newArray(int size) {
-            return new WearImage[size];
-        }
-    };
-
-    private WearImage(Parcel in) {
-        index = in.readInt();
-        position = in.readInt();
-        link = in.readString();
-        contextLink = in.readString();
-        imageData = in.createByteArray();
-    }
 }
