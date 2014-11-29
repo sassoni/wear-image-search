@@ -23,7 +23,8 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
     private static final String TAG = "***** WEAR: " + WImagesGridPagerAdapter.class.getSimpleName();
 
     public static final int BUTTON_LOAD_MORE = 11;
-    public static final int BUTTON_OPEN_ON_PHONE = 12;
+    // === Open on phone feature === //
+//    public static final int BUTTON_OPEN_ON_PHONE = 12;
 
     private Context context;
     private List<WearImage> list;
@@ -34,7 +35,6 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
 
     ButtonClickedListener buttonClickedListener;
 
-//    public WImagesGridPagerAdapter(Activity activity, List<Drawable> list) {
     public WImagesGridPagerAdapter(Activity activity, List<WearImage> list) {
         this.context = activity;
         this.list = list;
@@ -53,12 +53,14 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
 
     @Override
     public int getColumnCount(int row) {
+        // === Open on phone feature === //
         // No need for second column in the 'more' row
-        if (row == list.size()) {
-            return 1;
-        } else {
-            return 2;
-        }
+//        if (row == list.size()) {
+//            return 1;
+//        } else {
+//            return 2;
+//        }
+        return 1;
     }
 
     @Override
@@ -79,30 +81,30 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
         if (row < list.size()) {
             loadMoreLayout.setVisibility(View.GONE);
 
-            if (list.get(row) != null) {
+            if (list.get(row) != null) {  // If there is an image downloaded
                 imageView.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.GONE);
                 imageView.setBackground(list.get(row).getDrawable());
-//                imageView.setImageDrawable(list.get(row).getDrawable());
-//                imageView.setScaleType(ImageView.ScaleType.CENTER);
 
                 if (col == 0) {
                     overlayView.setVisibility(View.GONE);
                     openOnPhoneLayout.setVisibility(View.GONE);
-                } else {
-                    overlayView.setVisibility(View.VISIBLE);
-                    openOnPhoneLayout.setVisibility(View.VISIBLE);
-
-                    CircledImageView openOnPhoneBtn = (CircledImageView) view.findViewById(R.id.open_on_phone_circle);
-                    openOnPhoneBtn.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            if (buttonClickedListener != null) {
-                                buttonClickedListener.onButtonClicked(BUTTON_OPEN_ON_PHONE, row);
-                            }
-                        }
-                    });
                 }
+                // === Open on phone feature === //
+//                else {
+//                    overlayView.setVisibility(View.VISIBLE);
+//                    openOnPhoneLayout.setVisibility(View.VISIBLE);
+//
+//                    CircledImageView openOnPhoneBtn = (CircledImageView) view.findViewById(R.id.open_on_phone_circle);
+//                    openOnPhoneBtn.setOnClickListener(new View.OnClickListener() {
+//                        @Override
+//                        public void onClick(View v) {
+//                            if (buttonClickedListener != null) {
+//                                buttonClickedListener.onButtonClicked(BUTTON_OPEN_ON_PHONE, row);
+//                            }
+//                        }
+//                    });
+//                }
             } else {
                 imageView.setVisibility(View.GONE);
                 overlayView.setVisibility(View.GONE);
