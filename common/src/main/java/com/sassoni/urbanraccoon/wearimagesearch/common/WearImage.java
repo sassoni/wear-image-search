@@ -8,8 +8,8 @@ public class WearImage implements Parcelable {
 
     private int index;  // The index that the image appears in search results
     private int position;  // The position in the grid that the image will appear
-    private String link;
-    private String contextLink;
+    private String link;  // The link to download the image; could be original or thumbnail
+    private String contextLink;  // The link the image appears in
     private byte[] imageData;
     transient private Drawable drawable;
 
@@ -28,6 +28,14 @@ public class WearImage implements Parcelable {
         link = parcel.readString();
         contextLink = parcel.readString();
         imageData = parcel.createByteArray();
+    }
+
+    private WearImage(Parcel in) {
+        index = in.readInt();
+        position = in.readInt();
+        link = in.readString();
+        contextLink = in.readString();
+        imageData = in.createByteArray();
     }
 
     @Override
@@ -53,14 +61,6 @@ public class WearImage implements Parcelable {
             return new WearImage[size];
         }
     };
-
-    private WearImage(Parcel in) {
-        index = in.readInt();
-        position = in.readInt();
-        link = in.readString();
-        contextLink = in.readString();
-        imageData = in.createByteArray();
-    }
 
     public byte[] toByteArray() {
         Parcel parcel = Parcel.obtain();

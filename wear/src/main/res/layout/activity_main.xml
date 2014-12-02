@@ -17,7 +17,7 @@
         <android.support.wearable.view.CircledImageView
             android:id="@+id/tap_to_search_circle"
             style="@style/circle_button_layout"
-            android:src="@drawable/icon_search_2"
+            android:src="@drawable/icon_search"
             app:circle_color="@color/material_red"
             app:circle_radius="@dimen/circle_radius"
             app:circle_radius_pressed="@dimen/circle_radius_pressed" />

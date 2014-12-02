@@ -70,13 +70,12 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
         View view = LayoutInflater.from(context.getApplicationContext()).inflate(R.layout.grid_pager_image, viewGroup, false);
 
         RelativeLayout gridPagerView = (RelativeLayout) view.findViewById(R.id.grid_pager_view_layout);
-        LinearLayout openOnPhoneLayout = (LinearLayout) view.findViewById(R.id.open_on_phone_layout);
+//        LinearLayout openOnPhoneLayout = (LinearLayout) view.findViewById(R.id.open_on_phone_layout);
         LinearLayout loadMoreLayout = (LinearLayout) view.findViewById(R.id.load_more_layout);
-        ImageView imageView = (ImageView) view.findViewById(R.id.imageView);
-        View overlayView = view.findViewById(R.id.overlay_view);
+        ImageView imageView = (ImageView) view.findViewById(R.id.image_view);
+//        View overlayView = view.findViewById(R.id.overlay_view);
         ProgressBar progressBar = (ProgressBar) view.findViewById(R.id.progress_bar);
-
-        gridPagerView.setBackgroundColor(context.getResources().getColor(R.color.material_light_gray));
+        progressBar.getIndeterminateDrawable().setColorFilter(R.color.material_red, android.graphics.PorterDuff.Mode.SRC_ATOP);
 
         if (row < list.size()) {
             loadMoreLayout.setVisibility(View.GONE);
@@ -87,8 +86,8 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
                 imageView.setBackground(list.get(row).getDrawable());
 
                 if (col == 0) {
-                    overlayView.setVisibility(View.GONE);
-                    openOnPhoneLayout.setVisibility(View.GONE);
+//                    overlayView.setVisibility(View.GONE);
+//                    openOnPhoneLayout.setVisibility(View.GONE);
                 }
                 // === Open on phone feature === //
 //                else {
@@ -107,18 +106,17 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
 //                }
             } else {
                 imageView.setVisibility(View.GONE);
-                overlayView.setVisibility(View.GONE);
+//                overlayView.setVisibility(View.GONE);
                 progressBar.setVisibility(View.VISIBLE);
-                openOnPhoneLayout.setVisibility(View.GONE);
+//                openOnPhoneLayout.setVisibility(View.GONE);
             }
 
         } else {  // Final row
             imageView.setVisibility(View.GONE);
-            overlayView.setVisibility(View.GONE);
+//            overlayView.setVisibility(View.GONE);
             progressBar.setVisibility(View.GONE);
-            openOnPhoneLayout.setVisibility(View.GONE);
+//            openOnPhoneLayout.setVisibility(View.GONE);
             loadMoreLayout.setVisibility(View.VISIBLE);
-            gridPagerView.setBackgroundColor(context.getResources().getColor(R.color.material_gray));
 
             CircledImageView loadMoreBtn = (CircledImageView) view.findViewById(R.id.load_more_circle);
             loadMoreBtn.setOnClickListener(new View.OnClickListener() {

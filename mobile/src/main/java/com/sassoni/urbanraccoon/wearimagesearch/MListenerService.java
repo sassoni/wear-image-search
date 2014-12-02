@@ -39,7 +39,7 @@ public class MListenerService extends WearableListenerService {
 
     private GoogleApiClient googleApiClient;
     private RequestQueue requestQueue;
-    private static int position = 0;
+    private static int position;
     private String watchNode;
 
     @Override
@@ -77,7 +77,6 @@ public class MListenerService extends WearableListenerService {
 
             if (!googleApiClient.isConnected()) {
                 ConnectionResult connectionResult = googleApiClient.blockingConnect(10, TimeUnit.SECONDS);
-
                 if (!connectionResult.isSuccess()) {
                     Log.i(TAG, "GoogleApiClient connect failed with error code " + connectionResult.getErrorCode());
                     return;
@@ -153,10 +152,18 @@ public class MListenerService extends WearableListenerService {
                                 JSONObject item = items.getJSONObject(i);
                                 JSONObject image = item.getJSONObject("image");
 
-                                WearImage wearImage = new WearImage(searchStartIndex + i - 1, item.getString("link"), image.getString("contextLink"));
+                                // If original image > 200kb, better download the thumbnail
+                                int byteSize = image.getInt("byteSize");
+                                String downloadLink;
+                                if (byteSize < 200000) {
+                                    downloadLink = item.getString("link");
+                                } else {
+                                    downloadLink = image.getString("thumbnailLink");
+                                }
+
+                                WearImage wearImage = new WearImage(searchStartIndex + i - 1, downloadLink, image.getString("contextLink"));
                                 downloadAndSendImage(wearImage);
                             }
-
                         } catch (JSONException e) {
                             e.printStackTrace();
                             sendErrorMessageToWatch();
@@ -184,26 +191,20 @@ public class MListenerService extends WearableListenerService {
                     @Override
                     public void onResponse(Bitmap bitmap) {
 
-                        // Scale the bitmap
-                        Bitmap scaledBitmap = Bitmap.createScaledBitmap(bitmap, 250, 250, false);
-
-                        // Create byte array
                         ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                        scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream);
+                        // No need for optimum quality for now!! :)
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream);
                         byte[] byteArray = stream.toByteArray();
 
-                        // Compress the byteArray
                         byte[] compressedByteArray = null;
                         try {
                             compressedByteArray = GZipUtils.compress(byteArray);
-
                         } catch (IOException e) {
                             compressedByteArray = byteArray;
                             e.printStackTrace();
                         }
 
                         Log.i("BYTES bitmap", bitmap.getByteCount() + "");
-                        Log.i("BYTES scaledBitmap", scaledBitmap.getByteCount() + "");
                         Log.i("BYTES byteArray", byteArray.length + "");
                         Log.i("BYTES compressedByteArray", compressedByteArray.length + "");
 
@@ -214,7 +215,7 @@ public class MListenerService extends WearableListenerService {
 
                         sendImageToWatch(image);
                     }
-                }, 0, 0, null,
+                }, 250, 250, null,
                 new Response.ErrorListener() {
                     public void onErrorResponse(VolleyError error) {
                         // Nothing
