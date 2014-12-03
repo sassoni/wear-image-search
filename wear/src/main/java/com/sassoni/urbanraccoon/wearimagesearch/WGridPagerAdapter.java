@@ -76,7 +76,6 @@ public class WGridPagerAdapter extends GridPagerAdapter {
         ImageView imageView = (ImageView) view.findViewById(R.id.image_view);
 //        View overlayView = view.findViewById(R.id.overlay_view);
         ProgressBar progressBar = (ProgressBar) view.findViewById(R.id.progress_bar);
-        progressBar.getIndeterminateDrawable().setColorFilter(R.color.material_red, PorterDuff.Mode.SRC_IN);
 
         if (row < list.size()) {
             loadMoreLayout.setVisibility(View.GONE);
