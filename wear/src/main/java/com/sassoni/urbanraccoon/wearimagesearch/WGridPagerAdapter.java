@@ -2,6 +2,7 @@ package com.sassoni.urbanraccoon.wearimagesearch;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.PorterDuff;
 import android.support.wearable.view.CircledImageView;
 import android.support.wearable.view.GridPagerAdapter;
 import android.util.Log;
@@ -18,9 +19,9 @@ import com.sassoni.urbanraccoon.wearimagesearch.common.WearImage;
 
 import java.util.List;
 
-public class WImagesGridPagerAdapter extends GridPagerAdapter {
+public class WGridPagerAdapter extends GridPagerAdapter {
 
-    private static final String TAG = "***** WEAR: " + WImagesGridPagerAdapter.class.getSimpleName();
+    private static final String TAG = "***** WEAR: " + WGridPagerAdapter.class.getSimpleName();
 
     public static final int BUTTON_LOAD_MORE = 11;
     // === Open on phone feature === //
@@ -35,7 +36,7 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
 
     ButtonClickedListener buttonClickedListener;
 
-    public WImagesGridPagerAdapter(Activity activity, List<WearImage> list) {
+    public WGridPagerAdapter(Activity activity, List<WearImage> list) {
         this.context = activity;
         this.list = list;
         buttonClickedListener = (ButtonClickedListener) activity;
@@ -75,22 +76,21 @@ public class WImagesGridPagerAdapter extends GridPagerAdapter {
         ImageView imageView = (ImageView) view.findViewById(R.id.image_view);
 //        View overlayView = view.findViewById(R.id.overlay_view);
         ProgressBar progressBar = (ProgressBar) view.findViewById(R.id.progress_bar);
-        progressBar.getIndeterminateDrawable().setColorFilter(R.color.material_red, android.graphics.PorterDuff.Mode.SRC_ATOP);
+        progressBar.getIndeterminateDrawable().setColorFilter(R.color.material_red, PorterDuff.Mode.SRC_IN);
 
         if (row < list.size()) {
             loadMoreLayout.setVisibility(View.GONE);
 
             if (list.get(row) != null) {  // If there is an image downloaded
+                imageView.setBackground(list.get(row).getDrawable());
                 imageView.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.GONE);
-                imageView.setBackground(list.get(row).getDrawable());
 
-                if (col == 0) {
+                // === Open on phone feature === //
+//                if (col == 0) {
 //                    overlayView.setVisibility(View.GONE);
 //                    openOnPhoneLayout.setVisibility(View.GONE);
-                }
-                // === Open on phone feature === //
-//                else {
+//                } else {
 //                    overlayView.setVisibility(View.VISIBLE);
 //                    openOnPhoneLayout.setVisibility(View.VISIBLE);
 //

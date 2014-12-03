@@ -38,6 +38,14 @@ public class WearImage implements Parcelable {
         imageData = in.createByteArray();
     }
 
+    public byte[] toByteArray() {
+        Parcel parcel = Parcel.obtain();
+        this.writeToParcel(parcel, 0);
+        byte[] bytes = parcel.marshall();
+        parcel.recycle();
+        return bytes;
+    }
+
     @Override
     public int describeContents() {
         return 0;
@@ -61,14 +69,6 @@ public class WearImage implements Parcelable {
             return new WearImage[size];
         }
     };
-
-    public byte[] toByteArray() {
-        Parcel parcel = Parcel.obtain();
-        this.writeToParcel(parcel, 0);
-        byte[] bytes = parcel.marshall();
-        parcel.recycle();
-        return bytes;
-    }
 
     public int getIndex() {
         return index;

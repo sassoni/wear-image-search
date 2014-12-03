@@ -38,7 +38,7 @@ import java.util.List;
 public class WMainActivity extends Activity implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        WImagesGridPagerAdapter.ButtonClickedListener,
+        WGridPagerAdapter.ButtonClickedListener,
         MessageApi.MessageListener {
 
     private static final String TAG = "***** WEAR: " + WMainActivity.class.getSimpleName();
@@ -47,8 +47,8 @@ public class WMainActivity extends Activity implements
 
     private int requestIndex = 1;
 
-    private GoogleApiClient mGoogleApiClient;
-    private WImagesGridPagerAdapter adapter;
+    private GoogleApiClient googleApiClient;
+    private WGridPagerAdapter adapter;
     private List<WearImage> imagesList;
     private String searchTerm;
 
@@ -63,8 +63,6 @@ public class WMainActivity extends Activity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        startSpeechRecognizer();
-
         tapToSearchLayout = (LinearLayout) findViewById(R.id.tap_to_search_layout);
         gridViewPager = (GridViewPager) findViewById(R.id.main_grid_view_pager);
         errorMessage = (TextView) findViewById(R.id.error_message);
@@ -77,7 +75,7 @@ public class WMainActivity extends Activity implements
             }
         });
 
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
+        googleApiClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API)
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
@@ -86,23 +84,21 @@ public class WMainActivity extends Activity implements
         imagesList = new ArrayList<WearImage>();
         growListBy(Constants.MAX_IMAGES_PER_REQUEST);
 
-        adapter = new WImagesGridPagerAdapter(this, imagesList);
+        adapter = new WGridPagerAdapter(this, imagesList);
         gridViewPager.setAdapter(adapter);
-
-        switchToGridView();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        mGoogleApiClient.connect();
+        googleApiClient.connect();
     }
 
     @Override
     protected void onStop() {
-        if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
-            Wearable.MessageApi.removeListener(mGoogleApiClient, this);
-            mGoogleApiClient.disconnect();
+        if (googleApiClient != null && googleApiClient.isConnected()) {
+            Wearable.MessageApi.removeListener(googleApiClient, this);
+            googleApiClient.disconnect();
         }
         super.onStop();
     }
@@ -116,7 +112,7 @@ public class WMainActivity extends Activity implements
 
     @Override
     public void onConnected(Bundle bundle) {
-        Wearable.MessageApi.addListener(mGoogleApiClient, this);
+        Wearable.MessageApi.addListener(googleApiClient, this);
     }
 
     @Override
@@ -144,13 +140,13 @@ public class WMainActivity extends Activity implements
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK) {
-            //switchToGridView();
+            switchToGridView();
 
             List<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
             searchTerm = results.get(0);
             Log.i(TAG, searchTerm);
 
-            new SendRequestForSearchTermTask().execute();
+            new GetNodesAndSendRequest().execute();
         }
 
         super.onActivityResult(requestCode, resultCode, data);
@@ -158,20 +154,26 @@ public class WMainActivity extends Activity implements
 
     // ----- Sending data ----- //
 
-    private class SendRequestForSearchTermTask extends AsyncTask<Void, Void, Void> {
+    private class GetNodesAndSendRequest extends AsyncTask<Void, Void, Void> {
+        Collection<String> nodes;
+
         @Override
         protected Void doInBackground(Void... args) {
-            Log.i(TAG, "Start sending message...");
-            Collection<String> nodes = getNodes();
+            Log.i(TAG, "Retrieving nodes...");
+            nodes = getNodes();
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void aVoid) {
             if (nodes.isEmpty()) {
                 showErrorMessage();
             } else {
                 for (String node : nodes) {
-                    Log.i(TAG, "... to node: " + node);
+                    Log.i(TAG, "Sending message to: " + node);
                     sendRequestForSearchTerm(node);
                 }
             }
-            return null;
         }
     }
 
@@ -179,7 +181,7 @@ public class WMainActivity extends Activity implements
         Log.i(TAG, "Sending message");
 
         String specificPath = Constants.PATH_SEARCH + "/" + requestIndex;
-        Wearable.MessageApi.sendMessage(mGoogleApiClient, node, specificPath, searchTerm.getBytes())
+        Wearable.MessageApi.sendMessage(googleApiClient, node, specificPath, searchTerm.getBytes())
                 .setResultCallback(new ResultCallback<MessageApi.SendMessageResult>() {
                                        @Override
                                        public void onResult(MessageApi.SendMessageResult sendMessageResult) {
@@ -196,7 +198,7 @@ public class WMainActivity extends Activity implements
 
     private Collection<String> getNodes() {
         HashSet<String> results = new HashSet<String>();
-        NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi.getConnectedNodes(mGoogleApiClient).await();
+        NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi.getConnectedNodes(googleApiClient).await();
 
         if (nodes != null) {
             for (Node node : nodes.getNodes()) {
@@ -225,12 +227,12 @@ public class WMainActivity extends Activity implements
 
     @Override
     public void onButtonClicked(int buttonId, int row) {
-        if (buttonId == WImagesGridPagerAdapter.BUTTON_LOAD_MORE) {
+        if (buttonId == WGridPagerAdapter.BUTTON_LOAD_MORE) {
             loadMore();
         }
 
         // === Open on phone feature === //
-//        else if (buttonId == WImagesGridPagerAdapter.BUTTON_OPEN_ON_PHONE) {
+//        else if (buttonId == WGridPagerAdapter.BUTTON_OPEN_ON_PHONE) {
 //            openOnPhone(row);
 //        }
     }
@@ -242,7 +244,7 @@ public class WMainActivity extends Activity implements
 
         // See http://stackoverflow.com/questions/24742427/dynamically-adding-items-to-fragmentgridpageradapter
         adapter = null;
-        adapter = new WImagesGridPagerAdapter(this, imagesList);
+        adapter = new WGridPagerAdapter(this, imagesList);
         gridViewPager.setAdapter(adapter);
 
         // See https://code.google.com/p/android/issues/detail?id=75309
@@ -255,7 +257,7 @@ public class WMainActivity extends Activity implements
         Handler handler = new Handler();
         handler.postDelayed(setCurrentItemDelayed, 100);
 
-        new SendRequestForSearchTermTask().execute();
+        new GetNodesAndSendRequest().execute();
     }
 
     private void growListBy(int howMany) {
@@ -295,7 +297,7 @@ public class WMainActivity extends Activity implements
 //    private void sendOpenOnPhoneMessage(String node, String link) {
 //        Log.i(TAG, "Sending message");
 //
-//        Wearable.MessageApi.sendMessage(mGoogleApiClient, node, Constants.PATH_OPEN, link.getBytes())
+//        Wearable.MessageApi.sendMessage(googleApiClient, node, Constants.PATH_OPEN, link.getBytes())
 //                .setResultCallback(new ResultCallback<MessageApi.SendMessageResult>() {
 //                                       @Override
 //                                       public void onResult(MessageApi.SendMessageResult sendMessageResult) {
@@ -330,7 +332,7 @@ public class WMainActivity extends Activity implements
             image = images[0];
 
             byte[] compressedImageBytes = image.getImageData();
-            byte[] decompressedImageBytes = null;
+            byte[] decompressedImageBytes;
 
             try {
                 decompressedImageBytes = GZipUtils.decompress(image.getImageData());
